@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import jsPDF from "jspdf";
-import { supabase } from "@/app/lib/supabaseClient";
 
 export default function Home() {
   const [consoAnnuelle, setConsoAnnuelle] = useState<number>(4800);
@@ -46,11 +45,13 @@ export default function Home() {
     }
 
     setIsSaving(true);
+    setSaveSuccess(false);
 
     try {
-      const supabase = getSupabaseClient();
-      const { error } = await supabase.from("leads_solaires").insert([
-        {
+      const response = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           nom: nomClient,
           email: emailClient,
           telephone: telClient,
@@ -58,20 +59,21 @@ export default function Home() {
           puissance_kw: puissanceKw,
           economie_annuelle: Math.round(economieAnnuelle),
           gain_20ans: Math.round(gain20ans),
-        },
-      ]);
+        }),
+      });
 
-      if (error) {
-        console.error("Erreur Supabase :", error.message);
-      } else {
+      if (response.ok) {
         setSaveSuccess(true);
+      } else {
+        console.error("Erreur API:", await response.text());
       }
     } catch (err) {
-      console.error(err);
+      console.error("Erreur d'envoi:", err);
     } finally {
       setIsSaving(false);
     }
 
+    // Geração do PDF
     const doc = new jsPDF();
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
