@@ -2,21 +2,21 @@
 
 import { useState } from "react";
 import jsPDF from "jspdf";
+import { supabase } from "./lib/supabaseClient";
 
 export default function Home() {
-  // Parâmetros do Imóvel & Sistema
-  const [consoAnnuelle, setConsoAnnuelle] = useState<number>(4800); // kWh/an
-  const [prixKwh, setPrixKwh] = useState<number>(0.2516); // Tarif réglementé EDF base
-  const [region, setRegion] = useState<string>("Île-de-France");
-  const [puissanceKw, setPuissanceKw] = useState<number>(3); // kWc
-  const [coutInstallation, setCoutInstallation] = useState<number>(7500); // €
+  const [consoAnnuelle, setConsoAnnuelle] = useState<number>(4800);
+  const [prixKwh, setPrixKwh] = useState<number>(0.2516);
+  const [region, setRegion] = useState<string>("Île-de-France / Nord");
+  const [puissanceKw, setPuissanceKw] = useState<number>(3);
+  const [coutInstallation, setCoutInstallation] = useState<number>(7500);
 
-  // Dados do Cliente para Lead / PDF
   const [nomClient, setNomClient] = useState<string>("");
   const [emailClient, setEmailClient] = useState<string>("");
   const [telClient, setTelClient] = useState<string>("");
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
 
-  // Fatores médios de irradiação solar na França (kWh/kWc/an)
   const facteurRegion: Record<string, number> = {
     "Île-de-France / Nord": 950,
     "Ouest / Centre": 1100,
@@ -26,9 +26,7 @@ export default function Home() {
 
   const productible = facteurRegion[region] || 1100;
   const productionEstimee = puissanceKw * productible;
-  const factureActuelle = consoAnnuelle * prixKwh;
 
-  // Hipótese de 70% de autoconsumo e venda de excedente (~0.13 €/kWh pela EDF OA)
   const autoConsommee = Math.min(consoAnnuelle * 0.5, productionEstimee * 0.7);
   const surplusVendu = Math.max(0, productionEstimee - autoConsommee);
   const gainSurplus = surplusVendu * 0.13;
@@ -41,10 +39,39 @@ export default function Home() {
 
   const gain20ans = (economieAnnuelle * 20) - coutInstallation;
 
-  // Função para Gerar Relatório em PDF
-  const genererPDF = () => {
-    const doc = new jsPDF();
+  const handleValidationAndPDF = async () => {
+    if (!nomClient || !emailClient) {
+      alert("Veuillez renseigner au moins votre nom et e-mail.");
+      return;
+    }
 
+    setIsSaving(true);
+
+    try {
+      const { error } = await supabase.from("leads_solaires").insert([
+        {
+          nom: nomClient,
+          email: emailClient,
+          telephone: telClient,
+          region: region,
+          puissance_kw: puissanceKw,
+          economie_annuelle: Math.round(economieAnnuelle),
+          gain_20ans: Math.round(gain20ans),
+        },
+      ]);
+
+      if (error) {
+        console.error("Erreur Supabase :", error.message);
+      } else {
+        setSaveSuccess(true);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSaving(false);
+    }
+
+    const doc = new jsPDF();
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
     doc.text("Étude de Rentabilité Photovoltaïque", 20, 20);
@@ -54,38 +81,30 @@ export default function Home() {
     doc.text(`Document généré le : ${new Date().toLocaleDateString("fr-FR")}`, 20, 28);
     doc.text("--------------------------------------------------------------------------------------------------", 20, 32);
 
-    // Seção Cliente
     doc.setFont("helvetica", "bold");
     doc.text("Informations Client :", 20, 42);
     doc.setFont("helvetica", "normal");
-    doc.text(`Nom : ${nomClient || "Non renseigné"}`, 20, 50);
-    doc.text(`E-mail : ${emailClient || "Non renseigné"}`, 20, 56);
+    doc.text(`Nom : ${nomClient}`, 20, 50);
+    doc.text(`E-mail : ${emailClient}`, 20, 56);
     doc.text(`Téléphone : ${telClient || "Non renseigné"}`, 20, 62);
     doc.text(`Région : ${region}`, 20, 68);
 
-    // Seção Parâmetros
     doc.setFont("helvetica", "bold");
     doc.text("Paramètres de l'Installation :", 20, 80);
     doc.setFont("helvetica", "normal");
     doc.text(`Puissance installée : ${puissanceKw} kWc`, 20, 88);
     doc.text(`Consommation annuelle : ${consoAnnuelle} kWh/an`, 20, 94);
-    doc.text(`Prix actuel du kWh : ${prixKwh} €`, 20, 100);
-    doc.text(`Investissement estimé : ${coutInstallation.toLocaleString("fr-FR")} € TTC`, 20, 106);
+    doc.text(`Investissement estimé : ${coutInstallation.toLocaleString("fr-FR")} € TTC`, 20, 100);
 
-    // Seção Resultados
     doc.setFont("helvetica", "bold");
-    doc.text("Bilan Financier Prévisionnel :", 20, 118);
+    doc.text("Bilan Financier Prévisionnel :", 20, 112);
     doc.setFont("helvetica", "normal");
-    doc.text(`Production solaire estimée : ${productionEstimee.toFixed(0)} kWh/an`, 20, 126);
-    doc.text(`Économies annuelles totales : ~${economieAnnuelle.toFixed(0)} € / an`, 20, 132);
-    doc.text(`Temps de retour sur investissement : ${payback} ans`, 20, 138);
-    doc.text(`Gain net estimé sur 20 ans : +${gain20ans.toFixed(0)} €`, 20, 144);
+    doc.text(`Production solaire estimée : ${productionEstimee.toFixed(0)} kWh/an`, 20, 120);
+    doc.text(`Économies annuelles totales : ~${economieAnnuelle.toFixed(0)} € / an`, 20, 126);
+    doc.text(`Temps de retour sur investissement : ${payback} ans`, 20, 132);
+    doc.text(`Gain net estimé sur 20 ans : +${gain20ans.toFixed(0)} €`, 20, 138);
 
-    doc.text("--------------------------------------------------------------------------------------------------", 20, 160);
-    doc.setFontSize(8);
-    doc.text("* Simulation indicative sans valeur contractuelle basée sur les barèmes solaires en vigueur en France.", 20, 168);
-
-    doc.save(`etude-solaire-${nomClient || "client"}.pdf`);
+    doc.save(`etude-solaire-${nomClient.replace(/\s+/g, "_")}.pdf`);
   };
 
   return (
@@ -104,7 +123,6 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Formulário */}
           <div className="lg:col-span-7 bg-slate-800/80 p-6 rounded-2xl border border-slate-700 backdrop-blur-sm space-y-6">
             <h2 className="text-lg font-semibold text-white border-b border-slate-700 pb-3">
               1. Paramètres Techniques
@@ -164,12 +182,12 @@ export default function Home() {
             </div>
 
             <h2 className="text-lg font-semibold text-white border-b border-slate-700 pb-3 pt-2">
-              2. Coordonnées pour l&apos;Étude
+              2. Vos Coordonnées (Obligatoire pour l&apos;Étude)
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-300">Nom complet</label>
+                <label className="block text-xs font-medium text-slate-300">Nom complet *</label>
                 <input
                   type="text"
                   placeholder="Jean Dupont"
@@ -179,7 +197,7 @@ export default function Home() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-300">E-mail</label>
+                <label className="block text-xs font-medium text-slate-300">E-mail *</label>
                 <input
                   type="email"
                   placeholder="jean@exemple.fr"
@@ -201,7 +219,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Resumo Financeiro & Ação */}
           <div className="lg:col-span-5 bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-2xl border border-amber-500/30 flex flex-col justify-between shadow-xl">
             <div>
               <h2 className="text-xl font-bold text-amber-400 mb-6 flex items-center justify-between">
@@ -221,12 +238,12 @@ export default function Home() {
                 </div>
 
                 <div className="flex justify-between items-center text-sm border-b border-slate-700/60 pb-2.5">
-                  <span className="text-slate-400">Temps de Retour (Payback) :</span>
+                  <span className="text-slate-400">Temps de Retour :</span>
                   <span className="font-bold text-amber-400">{payback} ans</span>
                 </div>
 
                 <div className="flex justify-between items-center text-sm pt-1">
-                  <span className="text-slate-400">Bénéfice Net sur 20 ans :</span>
+                  <span className="text-slate-400">Bénéfice Net 20 ans :</span>
                   <span className="font-extrabold text-emerald-400 text-lg">+{gain20ans.toFixed(0)} €</span>
                 </div>
               </div>
@@ -234,11 +251,17 @@ export default function Home() {
 
             <div className="mt-8 space-y-3">
               <button
-                onClick={genererPDF}
-                className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2"
+                onClick={handleValidationAndPDF}
+                disabled={isSaving}
+                className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                <span>📄 Télécharger l&apos;Étude (PDF)</span>
+                <span>{isSaving ? "Enregistrement..." : "📄 Télécharger l'Étude (PDF)"}</span>
               </button>
+              {saveSuccess && (
+                <p className="text-xs text-center text-emerald-400 font-medium">
+                  ✓ Demande enregistrée avec succès dans la base.
+                </p>
+              )}
             </div>
           </div>
         </div>
