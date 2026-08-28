@@ -2,9 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = "https://udowdkpuwuofdpjshzxl.supabase.co";
-
-// Substitua pelo valor que você acabou de copiar (começa com eyJ...)
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkb3dka3B1d3VvZmRwanNoenhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MTYxMTEsImV4cCI6MjEwMzQ5MjExMX0.kWCJXyBJck277dCdA24MKMUBWhLL_ATNjFqF949zR0A";
+const supabaseAnonKey = "sb_publishable_qp4cYfsk6acBmvjiusJoAA_LmR-IP7o";
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -25,13 +23,12 @@ export async function POST(request: Request) {
     ]);
 
     if (error) {
-      console.error("Erro Supabase:", error);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     return NextResponse.json({ success: true, data }, { status: 200 });
-  } catch (err: any) {
-    console.error("Erro interno:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Erro desconhecido";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
