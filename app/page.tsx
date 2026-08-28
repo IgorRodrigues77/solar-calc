@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import jsPDF from "jspdf";
-import { getSupabaseClient } from "./lib/supabaseClient";
+import { supabase } from "@/app/lib/supabaseClient";
 
 export default function Home() {
   const [consoAnnuelle, setConsoAnnuelle] = useState<number>(4800);
