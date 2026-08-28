@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import jsPDF from "jspdf";
-import { supabase } from "@/app/lib/supabaseClient";
+import { getSupabaseClient } from "./lib/supabaseClient";
 
 export default function Home() {
   const [consoAnnuelle, setConsoAnnuelle] = useState<number>(4800);
@@ -48,6 +48,7 @@ export default function Home() {
     setIsSaving(true);
 
     try {
+      const supabase = getSupabaseClient();
       const { error } = await supabase.from("leads_solaires").insert([
         {
           nom: nomClient,
