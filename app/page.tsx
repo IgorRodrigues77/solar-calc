@@ -73,39 +73,115 @@ export default function Home() {
       setIsSaving(false);
     }
 
-    // Geração do PDF
+    // Geração do PDF Profissional
     const doc = new jsPDF();
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.text("Étude de Rentabilité Photovoltaïque", 20, 20);
 
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Document généré le : ${new Date().toLocaleDateString("fr-FR")}`, 20, 28);
-    doc.text("--------------------------------------------------------------------------------------------------", 20, 32);
+    // 1. Cabeçalho Escuro
+    doc.setFillColor(15, 23, 42); // Slate 900
+    doc.rect(0, 0, 210, 38, "F");
 
+    doc.setTextColor(245, 158, 11); // Âmbar / Amarelo solar
     doc.setFont("helvetica", "bold");
-    doc.text("Informations Client :", 20, 42);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Nom : ${nomClient}`, 20, 50);
-    doc.text(`E-mail : ${emailClient}`, 20, 56);
-    doc.text(`Téléphone : ${telClient || "Non renseigné"}`, 20, 62);
-    doc.text(`Région : ${region}`, 20, 68);
+    doc.setFontSize(16);
+    doc.text("ÉTUDE DE FAISABILITÉ PHOTOVOLTAÏQUE", 14, 18);
 
-    doc.setFont("helvetica", "bold");
-    doc.text("Paramètres de l'Installation :", 20, 80);
+    doc.setTextColor(203, 213, 225); // Slate 300
     doc.setFont("helvetica", "normal");
-    doc.text(`Puissance installée : ${puissanceKw} kWc`, 20, 88);
-    doc.text(`Consommation annuelle : ${consoAnnuelle} kWh/an`, 20, 94);
-    doc.text(`Investissement estimé : ${coutInstallation.toLocaleString("fr-FR")} € TTC`, 20, 100);
+    doc.setFontSize(9);
+    doc.text("Simulation prévisionnelle d'autoconsommation & rentabilité financière", 14, 26);
+    doc.text(`Rapport émis le : ${new Date().toLocaleDateString("fr-FR")}`, 155, 26);
 
+    // 2. Caixa: Dados do Cliente
+    doc.setFillColor(248, 250, 252); // Fundo cinza claro
+    doc.setDrawColor(226, 232, 240); // Borda suave
+    doc.roundedRect(14, 46, 182, 32, 3, 3, "FD");
+
+    doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
-    doc.text("Bilan Financier Prévisionnel :", 20, 112);
+    doc.setFontSize(11);
+    doc.text("INFORMATIONS BÉNÉFICIAIRE", 20, 54);
+
     doc.setFont("helvetica", "normal");
-    doc.text(`Production solaire estimée : ${productionEstimee.toFixed(0)} kWh/an`, 20, 120);
-    doc.text(`Économies annuelles totales : ~${economieAnnuelle.toFixed(0)} € / an`, 20, 126);
-    doc.text(`Temps de retour sur investissement : ${payback} ans`, 20, 132);
-    doc.text(`Gain net estimé sur 20 ans : +${gain20ans.toFixed(0)} €`, 20, 138);
+    doc.setFontSize(9.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Client : ${nomClient}`, 20, 63);
+    doc.text(`E-mail : ${emailClient}`, 20, 71);
+    doc.text(`Téléphone : ${telClient || "Non renseigné"}`, 110, 63);
+    doc.text(`Localisation : ${region}`, 110, 71);
+
+    // 3. Caixa: Características Técnicas
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(14, 84, 182, 38, 3, 3, "FD");
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("CONFIGURATION TECHNIQUE ESTIMÉE", 20, 92);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`• Puissance installée : ${puissanceKw} kWc`, 20, 101);
+    doc.text(`• Consommation de référence : ${consoAnnuelle.toLocaleString("fr-FR")} kWh/an`, 20, 109);
+    doc.text(`• Production annuelle estimée : ${productionEstimee.toFixed(0)} kWh/an`, 110, 101);
+    doc.text(`• Investissement indicatif : ${coutInstallation.toLocaleString("fr-FR")} € TTC`, 110, 109);
+
+    // 4. Três Destaques Financeiros (Cards coloridos)
+    // Card 1: Économie / an
+    doc.setFillColor(236, 253, 245); // Verde claro
+    doc.setDrawColor(16, 185, 129);  // Verde
+    doc.roundedRect(14, 130, 56, 32, 3, 3, "FD");
+    doc.setTextColor(5, 150, 105);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.text("ÉCONOMIE ANNUELLE", 18, 138);
+    doc.setFontSize(14);
+    doc.text(`~${economieAnnuelle.toFixed(0)} € / an`, 18, 151);
+
+    // Card 2: Temps de retour
+    doc.setFillColor(254, 243, 199); // Âmbar claro
+    doc.setDrawColor(245, 158, 11);  // Âmbar
+    doc.roundedRect(77, 130, 56, 32, 3, 3, "FD");
+    doc.setTextColor(180, 83, 9);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.text("RETOUR SUR INVEST.", 81, 138);
+    doc.setFontSize(14);
+    doc.text(`${payback} ans`, 81, 151);
+
+    // Card 3: Gain 20 ans
+    doc.setFillColor(238, 242, 255); // Azul índigo claro
+    doc.setDrawColor(99, 102, 241);  // Azul índigo
+    doc.roundedRect(140, 130, 56, 32, 3, 3, "FD");
+    doc.setTextColor(67, 56, 202);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.text("GAIN NET (20 ANS)", 144, 138);
+    doc.setFontSize(14);
+    doc.text(`+${gain20ans.toFixed(0)} €`, 144, 151);
+
+    // 5. Bloco de Explicação e Próximos Passos
+    doc.setFillColor(241, 245, 249);
+    doc.setDrawColor(203, 213, 225);
+    doc.roundedRect(14, 172, 182, 45, 3, 3, "FD");
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10.5);
+    doc.text("PROCHAINES ÉTAPES RECOMMANDÉES :", 20, 181);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text("1. Visite technique sur site pour vérifier l'orientation de toiture et le raccordement.", 20, 190);
+    doc.text("2. Confirmation de l'éligibilité aux primes de l'État (Prime à l'autoconsommation).", 20, 197);
+    doc.text("3. Validation du devis auprès d'un installateur certifié RGE QualiPV.", 20, 204);
+
+    // 6. Rodapé
+    doc.setFontSize(7.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text("Document à valeur informative fourni à titre indicatif selon les données déclarées.", 14, 280);
+    doc.text("Solar Calc • Générateur d'études photovoltaïques", 145, 280);
 
     doc.save(`etude-solaire-${nomClient.replace(/\s+/g, "_")}.pdf`);
   };
