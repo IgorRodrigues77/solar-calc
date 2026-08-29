@@ -135,11 +135,11 @@ export default function Home() {
 
     // Linha de cima (Y = 101)
     doc.text(`• Puissance crête : ${puissanceKw} kWc`, 20, 101);
-    doc.text(`• Production annuelle : ${productionEstimee.toFixed(0)} kWh/an`, 105, 101);
+    doc.text(`• Production annuelle : ${Math.round(productionEstimee)} kWh/an`, 105, 101);
 
     // Linha de baixo (Y = 111)
-    doc.text(`• Consommation : ${consoAnnuelle.toLocaleString("fr-FR")} kWh/an`, 20, 111);
-    doc.text(`• Investissement indicatif : ${coutInstallation.toLocaleString("fr-FR")} € TTC`, 105, 111);
+    doc.text(`• Consommation : ${consoAnnuelle} kWh/an`, 20, 111);
+    doc.text(`• Investissement indicatif : ${coutInstallation} € TTC`, 105, 111);
 
     // 4. Três Cards Financeiros
     // Card 1: Economia Anual
@@ -151,7 +151,7 @@ export default function Home() {
     doc.setFontSize(8);
     doc.text("ÉCONOMIE ANNUELLE", 18, 135);
     doc.setFontSize(12.5);
-    doc.text(`env. ${economieAnnuelle.toFixed(0)} € / an`, 18, 147);
+    doc.text(`env. ${Math.round(economieAnnuelle)} € / an`, 18, 147);
 
     // Card 2: Retorno
     doc.setFillColor(254, 243, 199);
@@ -173,7 +173,7 @@ export default function Home() {
     doc.setFontSize(8);
     doc.text("GAIN ESTIMÉ (20 ANS)", 144, 135);
     doc.setFontSize(12.5);
-    doc.text(`+${gain20ans.toFixed(0)} €`, 144, 147);
+    doc.text(`+${Math.round(gain20ans)} €`, 144, 147);
 
     // 5. Bloco de Acompanhamento & Garantias
     doc.setFillColor(241, 245, 249);
