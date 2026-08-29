@@ -4,7 +4,6 @@ import { useState } from "react";
 import jsPDF from "jspdf";
 
 export default function Home() {
-  // Controle do Wizard (Passos 1, 2 e 3)
   const [currentStep, setCurrentStep] = useState(1);
 
   // Dados Técnicos
@@ -48,8 +47,6 @@ export default function Home() {
       ? (coutInstallation / economieAnnuelle).toFixed(1)
       : "N/A";
   const gain20ans = economieAnnuelle * 20 - coutInstallation;
-  
-  // Métrica Ecológica
   const co2EviteKg = Math.round(productionEstimee * 0.05);
 
   const handlePuissanceChange = (val: number) => {
@@ -90,118 +87,337 @@ export default function Home() {
       setIsSaving(false);
     }
 
-    // Geração do PDF
+    // ==========================================
+    // GERAÇÃO DO DOSSIER COMPLETO DE 5 PÁGINAS
+    // ==========================================
     const doc = new jsPDF();
+    const dateJour = new Date().toLocaleDateString("fr-FR");
 
+    // Helper: Rodapé Padrão
+    const renderFooter = (pageNumber: number) => {
+      doc.setFontSize(7.5);
+      doc.setTextColor(148, 163, 184);
+      doc.text("SOLAR ENERGIE FRANCE • Dossier d'Étude Photovoltaïque • Confidentiel", 14, 285);
+      doc.text(`Page ${pageNumber} / 5`, 185, 285);
+    };
+
+    // Helper: Cabeçalho Padrão para Páginas 2 a 5
+    const renderHeader = (title: string, subtitle: string) => {
+      doc.setFillColor(15, 23, 42); // Slate 900
+      doc.rect(0, 0, 210, 32, "F");
+
+      doc.setTextColor(245, 158, 11);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("SOLAR ENERGIE FRANCE", 14, 13);
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.text(title, 14, 23);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(148, 163, 184);
+      doc.text(subtitle, 130, 23);
+    };
+
+    // ==========================================
+    // PAGE 1 — COUVERTURE (Page de Garde)
+    // ==========================================
     doc.setFillColor(15, 23, 42);
-    doc.rect(0, 0, 210, 42, "F");
+    doc.rect(0, 0, 210, 297, "F");
+
+    // Linha de detalhe em cor solar
+    doc.setFillColor(245, 158, 11);
+    doc.rect(0, 0, 8, 297, "F");
 
     doc.setTextColor(245, 158, 11);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.text("SOLAR ENERGIE FRANCE", 14, 16);
+    doc.setFontSize(16);
+    doc.text("SOLAR ENERGIE FRANCE", 25, 45);
 
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
     doc.setTextColor(148, 163, 184);
-    doc.text("Installateur Qualifié RGE QualiPV  •  01 89 00 00 00  •  contact@solarenergie.fr", 14, 23);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text("Ingénierie & Solutions d'Autoconsommation Résidentielle", 25, 52);
 
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(26);
+    doc.text("ÉTUDE DE FAISABILITÉ", 25, 110);
+    doc.text("PHOTOVOLTAÏQUE", 25, 122);
+
+    doc.setFontSize(12);
+    doc.setTextColor(203, 213, 225);
+    doc.setFont("helvetica", "normal");
+    doc.text("Dimensionnement technique, rentabilité prévisionnelle & bilan carbone", 25, 134);
+
+    // Box Destinatário
+    doc.setFillColor(30, 41, 59);
+    doc.setDrawColor(51, 65, 85);
+    doc.roundedRect(25, 175, 160, 45, 4, 4, "FD");
+
+    doc.setTextColor(245, 158, 11);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text("BÉNÉFICIAIRE DE L'ÉTUDE", 32, 187);
+
+    doc.setTextColor(255, 255, 255);
     doc.setFontSize(11);
-    doc.text("ÉTUDE DE FAISABILITÉ PHOTOVOLTAÏQUE", 14, 34);
+    doc.text(`Nom / Titulaire : ${nomClient}`, 32, 196);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    doc.setTextColor(203, 213, 225);
+    doc.text(`Contact : ${emailClient}  |  ${telClient || "Non renseigné"}`, 32, 204);
+    doc.text(`Secteur : ${region}`, 32, 212);
 
     doc.setFontSize(8.5);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(203, 213, 225);
-    doc.text(`Rapport émis le : ${new Date().toLocaleDateString("fr-FR")}`, 155, 34);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`Date d'émission : ${dateJour}`, 25, 260);
+    doc.text("Rapport d'audit préliminaire généré automatiquement", 25, 266);
+
+    // ==========================================
+    // PAGE 2 — VOTRE PROJET (Synthèse Technique)
+    // ==========================================
+    doc.addPage();
+    renderHeader("SYNTHÈSE DU PROJET", "Étape 1 sur 4");
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.text("1. Caractéristiques de l'Installation", 14, 46);
 
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(14, 48, 182, 30, 3, 3, "FD");
-
-    doc.setTextColor(15, 23, 42);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10.5);
-    doc.text("INFORMATIONS DU BÉNÉFICIAIRE", 20, 56);
+    doc.roundedRect(14, 52, 182, 55, 3, 3, "FD");
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
+    doc.setFontSize(9.5);
     doc.setTextColor(71, 85, 105);
-    doc.text(`Nom / Titulaire : ${nomClient}`, 20, 64);
-    doc.text(`E-mail : ${emailClient}`, 20, 71);
-    doc.text(`Téléphone : ${telClient || "Non renseigné"}`, 105, 64);
-    doc.text(`Secteur géographique : ${region}`, 105, 71);
-
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(14, 83, 182, 38, 3, 3, "FD");
-
-    doc.setTextColor(15, 23, 42);
+    doc.text(`• Puissance crête sélectionnée :`, 20, 64);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10.5);
-    doc.text("CONFIGURATION TECHNIQUE PROPOSÉE", 20, 91);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`${puissanceKw} kWc (~${puissanceKw === 3 ? "6-8" : puissanceKw === 6 ? "12-16" : "18-24"} modules)`, 85, 64);
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
     doc.setTextColor(71, 85, 105);
-    doc.text(`• Puissance crête : ${puissanceKw} kWc`, 20, 100);
-    doc.text(`• Consommation : ${consoAnnuelle} kWh/an`, 20, 108);
-    doc.text(`• Production annuelle : ${Math.round(productionEstimee)} kWh/an`, 105, 100);
-    doc.text(`• Investissement indicatif : ${coutInstallation} € TTC`, 105, 108);
+    doc.text(`• Surface de toiture requise :`, 20, 74);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(15, 23, 42);
+    doc.text(`~${puissanceKw * 5} m² de toiture disponible`, 85, 74);
+
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(71, 85, 105);
+    doc.text(`• Estimation du gisement solaire :`, 20, 84);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(15, 23, 42);
+    doc.text(`${productible} kWh/kWc/an (${region})`, 85, 84);
+
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(71, 85, 105);
+    doc.text(`• Production annuelle totale :`, 20, 94);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(16, 185, 129);
+    doc.text(`${Math.round(productionEstimee)} kWh / an`, 85, 94);
+
+    // Box Impact Environnemental
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.text("2. Bilan Écologique & Décarbonation", 14, 125);
 
     doc.setFillColor(236, 253, 245);
     doc.setDrawColor(16, 185, 129);
-    doc.roundedRect(14, 127, 56, 30, 3, 3, "FD");
+    doc.roundedRect(14, 131, 182, 38, 3, 3, "FD");
+
     doc.setTextColor(5, 150, 105);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.text("ÉCONOMIE ANNUELLE", 18, 135);
-    doc.setFontSize(12.5);
-    doc.text(`env. ${Math.round(economieAnnuelle)} € / an`, 18, 147);
+    doc.setFontSize(10);
+    doc.text("RÉDUCTION DE L'EMPREINTE CARBONE", 20, 141);
 
-    doc.setFillColor(254, 243, 199);
-    doc.setDrawColor(245, 158, 11);
-    doc.roundedRect(77, 127, 56, 30, 3, 3, "FD");
-    doc.setTextColor(180, 83, 9);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Grâce à la production décarbonée de votre centrale solaire, vous évitez :`, 20, 150);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.text("RETOUR SUR INVEST.", 81, 135);
-    doc.setFontSize(12.5);
-    doc.text(`${payback} ans`, 81, 147);
+    doc.setTextColor(5, 150, 105);
+    doc.text(`~${co2EviteKg} kg de CO₂ par an  (soit plus de ${(co2EviteKg * 20 / 1000).toFixed(1)} tonnes de CO₂ évitées sur 20 ans).`, 20, 159);
 
-    doc.setFillColor(238, 242, 255);
-    doc.setDrawColor(99, 102, 241);
-    doc.roundedRect(140, 127, 56, 30, 3, 3, "FD");
-    doc.setTextColor(67, 56, 202);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.text("GAIN CUMULÉ ESTIMÉ", 144, 135);
-    doc.setFontSize(12.5);
-    doc.text(`+${Math.round(gain20ans)} €`, 144, 147);
+    renderFooter(2);
 
-    doc.setFillColor(241, 245, 249);
-    doc.setDrawColor(203, 213, 225);
-    doc.roundedRect(14, 164, 182, 48, 3, 3, "FD");
+    // ==========================================
+    // PAGE 3 — ANALYSE FINANCIÈRE
+    // ==========================================
+    doc.addPage();
+    renderHeader("ANALYSE FINANCIÈRE", "Étape 2 sur 4");
 
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.text("ENGAGEMENTS & VALIDATION TECHNIQUE :", 20, 173);
+    doc.setFontSize(13);
+    doc.text("Synthèse des Flux Économiques", 14, 46);
+
+    // Cards Principais
+    // Card Investissement
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(14, 54, 56, 35, 3, 3, "FD");
+    doc.setTextColor(100, 116, 139);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.text("INVESTISSEMENT ESTIMÉ", 18, 64);
+    doc.setFontSize(13);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`${coutInstallation} € TTC`, 18, 77);
+
+    // Card Économie
+    doc.setFillColor(236, 253, 245);
+    doc.setDrawColor(16, 185, 129);
+    doc.roundedRect(77, 54, 56, 35, 3, 3, "FD");
+    doc.setTextColor(5, 150, 105);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.text("ÉCONOMIE ANNUELLE", 81, 64);
+    doc.setFontSize(13);
+    doc.text(`~${Math.round(economieAnnuelle)} € / an`, 81, 77);
+
+    // Card Retour
+    doc.setFillColor(254, 243, 199);
+    doc.setDrawColor(245, 158, 11);
+    doc.roundedRect(140, 54, 56, 35, 3, 3, "FD");
+    doc.setTextColor(180, 83, 9);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.text("RETOUR ESTIMÉ", 144, 64);
+    doc.setFontSize(13);
+    doc.text(`${payback} ans`, 144, 77);
+
+    // Detalhamento do Retorno
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("Répartition des Revenus et Économies Annuelles :", 14, 106);
+
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(14, 112, 182, 45, 3, 3, "FD");
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`• Économies sur facture (Autoconsommation directe ~70%) :`, 20, 124);
+    doc.text(`~${Math.round(economieAutoconsommation)} € / an`, 155, 124);
+
+    doc.text(`• Revente du surplus non consommé (Tarif garanti EDF OA ~0,13 €/kWh) :`, 20, 134);
+    doc.text(`~${Math.round(venteSurplus)} € / an`, 155, 134);
+
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(15, 23, 42);
+    doc.text(`• Gain cumulé net estimé sur 20 ans :`, 20, 146);
+    doc.setTextColor(67, 56, 202);
+    doc.text(`+${Math.round(gain20ans)} €`, 155, 146);
+
+    renderFooter(3);
+
+    // ==========================================
+    // PAGE 4 — PROJECTION SUR 20 ANS
+    // ==========================================
+    doc.addPage();
+    renderHeader("PROJECTION SUR 20 ANS", "Étape 3 sur 4");
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.text("Évolution Prévisionnelle de la Trésorerie", 14, 46);
+
+    // Tabela dos Anos
+    doc.setFillColor(15, 23, 42);
+    doc.rect(14, 54, 182, 9, "F");
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.text("Année", 20, 60);
+    doc.text("Production (kWh)", 55, 60);
+    doc.text("Économie / an (€)", 105, 60);
+    doc.text("Bilan Cumulé Net (€)", 150, 60);
+
+    const jalons = [1, 3, 5, 8, 10, 15, 20];
+    let posY = 71;
+
+    jalons.forEach((an, idx) => {
+      const cumul = economieAnnuelle * an - coutInstallation;
+      if (idx % 2 === 0) {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(14, posY - 5, 182, 8, "F");
+      }
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(71, 85, 105);
+
+      doc.text(`Année ${an}`, 20, posY);
+      doc.text(`${Math.round(productionEstimee)} kWh`, 55, posY);
+      doc.text(`+${Math.round(economieAnnuelle * an)} €`, 105, posY);
+
+      if (cumul >= 0) {
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(16, 185, 129);
+        doc.text(`+${Math.round(cumul)} €`, 150, posY);
+      } else {
+        doc.setTextColor(225, 29, 72);
+        doc.text(`${Math.round(cumul)} €`, 150, posY);
+      }
+
+      posY += 9;
+    });
+
+    renderFooter(4);
+
+    // ==========================================
+    // PAGE 5 — HYPOTHÈSES & MÉTHODOLOGIE
+    // ==========================================
+    doc.addPage();
+    renderHeader("HYPOTHÈSES & MÉTHODOLOGIE", "Étape 4 sur 4");
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.text("Cadre Technique & Réglementaire", 14, 46);
+
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(14, 52, 182, 110, 3, 3, "FD");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text("1. Hypothèses de Calcul", 20, 63);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
     doc.setTextColor(71, 85, 105);
-    doc.text("• Étude de faisabilité et vérification de structure toiture sous 48h.", 20, 182);
-    doc.text("• Accompagnement démarches administratives : Mairie, Consuel et raccordement Enedis.", 20, 189);
-    doc.text("• Éligibilité prime à l'autoconsommation et contrat de rachat EDF OA sur 20 ans.", 20, 196);
-    doc.text("• Matériel certifié avec garantie de rendement linéaire jusqu'à 25 ans.", 20, 203);
+    doc.text("• Coût de l'électricité réseau de référence : 0,25 € / kWh TTC (Tarif Bleu réglementé).", 20, 72);
+    doc.text("• Taux d'autoconsommation moyen estimé : 70% selon profil résidentiel standard.", 20, 80);
+    doc.text("• Tarif de rachat surplus : fixé selon barème EDF Obligation d'Achat contracté sur 20 ans.", 20, 88);
 
-    doc.setFontSize(7.5);
-    doc.setTextColor(148, 163, 184);
-    doc.text("Document établi à titre informatif selon les barèmes en vigueur. Non contractuel.", 14, 280);
-    doc.text("Service Client : contact@solarenergie.fr | www.solarenergie.fr", 115, 280);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text("2. Garanties & Normes de Pose", 20, 102);
 
-    doc.save(`etude-solaire-${nomClient.replace(/\s+/g, "_")}.pdf`);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text("• Modules photovoltaïques monocristallins avec garantie de rendement 25 ans.", 20, 111);
+    doc.text("• Onduleur ou micro-onduleurs haute efficacité avec suivi applicatif en temps réel.", 20, 119);
+    doc.text("• Installation réalisée par des techniciens qualifiés RGE QualiPV ouvrant droit aux aides d'État.", 20, 127);
+    doc.text("• Attestation de conformité visée par le CONSUEL avant raccordement réseau Enedis.", 20, 135);
+
+    renderFooter(5);
+
+    // Salvar o arquivo PDF
+    doc.save(`etude-solaire-complete-${nomClient.replace(/\s+/g, "_")}.pdf`);
   };
 
   return (
@@ -266,7 +482,7 @@ export default function Home() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-emerald-400 font-bold">✓</span>
-                <span>Étude PDF disponible</span>
+                <span>Étude complète (5 pages PDF)</span>
               </div>
             </div>
           </div>
@@ -280,7 +496,7 @@ export default function Home() {
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
                 </div>
                 <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
-                  Aperçu de l&apos;Étude
+                  Dossier d&apos;Étude 5 Pages
                 </span>
               </div>
 
@@ -306,7 +522,6 @@ export default function Home() {
 
         {/* Wizard Multi-Step Form */}
         <div id="simulateur" className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Lado Esquerdo: Formulário em Etapas */}
           <div className="lg:col-span-6 space-y-6">
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl backdrop-blur-sm">
               {/* Stepper Progress Bar */}
@@ -485,7 +700,7 @@ export default function Home() {
                       Étape 3 — Vos coordonnées
                     </h2>
                     <p className="text-xs text-slate-400">
-                      Remplissez vos informations pour débloquer votre bilan complet et télécharger le dossier PDF.
+                      Remplissez vos informations pour débloquer votre bilan complet et télécharger le dossier de 5 pages.
                     </p>
                   </div>
 
@@ -553,7 +768,7 @@ export default function Home() {
                       className="bg-amber-500 hover:bg-amber-400 active:scale-[0.99] disabled:opacity-50 text-slate-950 font-bold py-2.5 px-5 rounded-xl shadow-lg shadow-amber-500/20 transition flex items-center space-x-2 text-sm cursor-pointer"
                     >
                       <span>📄</span>
-                      <span>{isSaving ? "Génération..." : "Voir mon estimation & PDF"}</span>
+                      <span>{isSaving ? "Génération..." : "Télécharger l'Étude Complète (PDF)"}</span>
                     </button>
                   </div>
                 </div>
@@ -561,7 +776,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Lado Direito: Resultados WOW com Linguagem Prudente */}
+          {/* Lado Direito: Resultados WOW com Nomenclatura Prudente */}
           <div className="lg:col-span-6">
             <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-2xl backdrop-blur-md sticky top-24 space-y-6">
               <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -609,7 +824,7 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Gráfico de Rentabilidade com Nomenclatura Prudente */}
+              {/* Gráfico de Rentabilidade */}
               <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
                 <div className="flex justify-between items-center">
                   <p className="text-xs font-semibold text-slate-300">Votre investissement sur 20 ans</p>
@@ -651,7 +866,7 @@ export default function Home() {
                     className="w-full bg-amber-500 hover:bg-amber-400 active:scale-[0.99] disabled:opacity-50 text-slate-950 font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-amber-500/20 transition flex items-center justify-center space-x-2 text-sm cursor-pointer"
                   >
                     <span>📄</span>
-                    <span>{isSaving ? "Génération en cours..." : "Télécharger mon Étude (PDF)"}</span>
+                    <span>{isSaving ? "Génération en cours..." : "Télécharger mon Dossier d'Étude (PDF)"}</span>
                   </button>
 
                   {saveSuccess && (
