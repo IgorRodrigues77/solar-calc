@@ -5,7 +5,7 @@ export async function POST(req: Request) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.error("GEMINI_API_KEY non trouvée dans les variables d'environnement.");
+      console.error("GEMINI_API_KEY non trouvée.");
       return NextResponse.json({ error: "Clé API non configurée" }, { status: 500 });
     }
 
@@ -23,8 +23,9 @@ export async function POST(req: Request) {
     const base64Data = buffer.toString("base64");
     const mimeType = file.type || "application/pdf";
 
+    // Atualizado para o modelo ativo recomendado: gemini-3.6-flash
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.6-flash",
       contents: [
         {
           role: "user",
@@ -36,11 +37,11 @@ export async function POST(req: Request) {
               },
             },
             {
-              text: `Vous êtes un extracteur expert de factures d'énergie en France.
-Extrayez ces 3 informations précises au format JSON :
-1. nom: nom et prénom du titulaire (ex: PIERRE BOKOBZA).
-2. adresse: adresse du lieu de consommation (rue, code postal et ville).
-3. conso: consommation annuelle totale en kWh (CAR ou estimée). Si absent, montant TTC / 0.25. Entier uniquement.`,
+              text: `Vous êtes un extracteur expert de factures d'énergie en France (EDF, TotalEnergies, Engie, Enedis).
+Analysez le document et extrayez ces 3 champs structurés au format JSON :
+1. nom: nom et prénom complets du client ou titulaire du contrat (ex: PIERRE BOKOBZA).
+2. adresse: adresse complète du lieu de consommation (numéro, rue, code postal et ville).
+3. conso: consommation annuelle totale en kWh (CAR ou consommation annuelle estimée). Si absent, montant TTC / 0.25. Entier uniquement.`,
             },
           ],
         },
