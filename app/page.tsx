@@ -396,8 +396,9 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Hero Section Clean */}
+      {/* Main Container */}
       <main className="max-w-6xl mx-auto px-6 py-12">
+        {/* Hero Section */}
         <div className="max-w-3xl mb-12">
           <p className="text-xs font-semibold uppercase tracking-wider text-blue-600 mb-3">
             Simulateur d&apos;Ingénierie Solaire
@@ -410,8 +411,8 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Layout Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+        {/* Layout Grid do Simulador */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start mb-24">
           
           {/* Lado Esquerdo: Formulário em Etapas */}
           <div className="lg:col-span-7">
@@ -763,10 +764,106 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* SECTION 1: Pourquoi utiliser notre simulateur ? */}
+        <section className="border-t border-zinc-200 pt-16 mb-20">
+          <div className="max-w-2xl mb-10">
+            <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 block mb-2">
+              Avantages Clés
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-bold text-zinc-950 tracking-tight">
+              Pourquoi utiliser notre simulateur ?
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-4 font-bold text-lg">
+                ⚡
+              </div>
+              <h3 className="text-base font-bold text-zinc-900 mb-2">
+                Résultats en quelques secondes
+              </h3>
+              <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
+                Obtenez une première estimation fiable et instantanée de votre projet photovoltaïque sans engagement.
+              </p>
+            </div>
+
+            <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-4 font-bold text-lg">
+                📊
+              </div>
+              <h3 className="text-base font-bold text-zinc-900 mb-2">
+                Vision claire de votre rentabilité
+              </h3>
+              <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
+                Visualisez vos économies prévisionnelles, votre flux de trésorerie annuel et votre temps de retour sur investissement.
+              </p>
+            </div>
+
+            <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-4 font-bold text-lg">
+                📑
+              </div>
+              <h3 className="text-base font-bold text-zinc-900 mb-2">
+                Votre étude complète en PDF
+              </h3>
+              <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
+                Téléchargez immédiatement votre dossier technique d&apos;ingénierie de 5 pages pour conserver et comparer vos données.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* SECTION 2: Comment ça marche ? */}
+        <section className="border-t border-zinc-200 pt-16">
+          <div className="max-w-2xl mb-12">
+            <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 block mb-2">
+              Méthodologie
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-bold text-zinc-950 tracking-tight">
+              Comment ça marche ?
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm relative">
+              <span className="text-xs font-mono font-bold text-blue-600 block mb-3">01</span>
+              <h3 className="text-base font-bold text-zinc-900 mb-2">Vos informations</h3>
+              <p className="text-xs text-zinc-500 leading-relaxed">
+                Indiquez votre région géographique et votre niveau de consommation annuelle d&apos;électricité.
+              </p>
+            </div>
+
+            <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm relative">
+              <span className="text-xs font-mono font-bold text-blue-600 block mb-3">02</span>
+              <h3 className="text-base font-bold text-zinc-900 mb-2">Simulation</h3>
+              <p className="text-xs text-zinc-500 leading-relaxed">
+                L&apos;algorithme calcule le productible solaire optimal en fonction de l&apos;ensoleillement régional.
+              </p>
+            </div>
+
+            <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm relative">
+              <span className="text-xs font-mono font-bold text-blue-600 block mb-3">03</span>
+              <h3 className="text-base font-bold text-zinc-900 mb-2">Résultats</h3>
+              <p className="text-xs text-zinc-500 leading-relaxed">
+                Découvrez votre bilan financier indicatif, le temps d&apos;amortissement et votre impact carbone.
+              </p>
+            </div>
+
+            <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm relative">
+              <span className="text-xs font-mono font-bold text-blue-600 block mb-3">04</span>
+              <h3 className="text-base font-bold text-zinc-900 mb-2">Étude PDF</h3>
+              <p className="text-xs text-zinc-500 leading-relaxed">
+                Éditez et téléchargez instantanément votre rapport complet prêt pour vos démarches.
+              </p>
+            </div>
+          </div>
+        </section>
       </main>
 
       {/* Footer Minimalista */}
-      <footer className="border-t border-zinc-200 bg-white py-12 mt-20 text-xs text-zinc-400">
+      <footer className="border-t border-zinc-200 bg-white py-12 mt-24 text-xs text-zinc-400">
         <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="font-medium text-zinc-700">
             SOLAR ENERGIE FRANCE • Solutions Photovoltaïques Résidentielles
