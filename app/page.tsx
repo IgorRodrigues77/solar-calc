@@ -90,7 +90,7 @@ export default function Home() {
     } else if (lat < 46.2 || [33, 40, 64, 24, 47, 69, 38, 73, 74].includes(dept)) {
       detectedRegion = "Sud-Ouest / Rhône-Alpes";
       detectedProd = 1250;
-    } else if (lat > 48.2 || [75, 77, 78, 91, 92, 93, 94, 95, 59, 62, 80, 60, 02].includes(dept)) {
+    } else if (lat > 48.2 || [75, 77, 78, 91, 92, 93, 94, 95, 59, 62, 80, 60, 2].includes(dept)) {
       detectedRegion = "Île-de-France / Nord";
       detectedProd = 950;
     }
