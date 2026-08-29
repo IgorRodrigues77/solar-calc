@@ -1,14 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import jsPDF from "jspdf";
 import Link from "next/link";
+
+interface AddressSuggestion {
+  label: string;
+  postcode: string;
+  city: string;
+  context: string;
+  coordinates: [number, number]; // [lon, lat]
+}
 
 export default function Home() {
   const [currentStep, setCurrentStep] = useState(1);
 
+  // Endereço e Geocodificação
+  const [addressInput, setAddressInput] = useState("");
+  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
+  const [selectedAddress, setSelectedAddress] = useState<AddressSuggestion | null>(null);
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+
   // Dados Técnicos
   const [region, setRegion] = useState("Île-de-France / Nord");
+  const [productible, setProductible] = useState(950);
   const [puissanceKw, setPuissanceKw] = useState(3);
   const [consoAnnuelle, setConsoAnnuelle] = useState(4800);
   const [coutInstallation, setCoutInstallation] = useState(7500);
@@ -22,15 +37,69 @@ export default function Home() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Fatores de Cálculo
-  const facteursRegion: Record<string, number> = {
-    "Île-de-France / Nord": 950,
-    "Grand-Est / Centre": 1050,
-    "Sud-Ouest / Rhône-Alpes": 1250,
-    "Provence / PACA / Occitanie": 1400,
+  // Busca de Endereço na API Adresse du Gouvernement (Gratuita & Oficial)
+  useEffect(() => {
+    if (addressInput.length < 3 || (selectedAddress && addressInput === selectedAddress.label)) {
+      setSuggestions([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingAddress(true);
+      try {
+        const res = await fetch(
+          `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(addressInput)}&limit=5`
+        );
+        const data = await res.json();
+        if (data.features) {
+          const list: AddressSuggestion[] = data.features.map((f: any) => ({
+            label: f.properties.label,
+            postcode: f.properties.postcode,
+            city: f.properties.city,
+            context: f.properties.context,
+            coordinates: f.geometry.coordinates,
+          }));
+          setSuggestions(list);
+        }
+      } catch (err) {
+        console.error("Erreur API Adresse:", err);
+      } finally {
+        setIsSearchingAddress(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [addressInput, selectedAddress]);
+
+  // Identificação Automática da Região e Irradiação Solar baseada no CEP/Latitude
+  const handleSelectAddress = (addr: AddressSuggestion) => {
+    setSelectedAddress(addr);
+    setAddressInput(addr.label);
+    setSuggestions([]);
+
+    const dept = parseInt(addr.postcode.substring(0, 2), 10);
+    const lat = addr.coordinates[1];
+
+    let detectedRegion = "Grand-Est / Centre";
+    let detectedProd = 1050;
+
+    // Detecção por Latitude / Região Solar Francesa
+    if (lat < 44.5 || [13, 83, 84, 6, 4, 5, 30, 34, 66, 11, 20].includes(dept)) {
+      detectedRegion = "Provence / PACA / Occitanie";
+      detectedProd = 1400;
+    } else if (lat < 46.2 || [33, 40, 64, 24, 47, 69, 38, 73, 74].includes(dept)) {
+      detectedRegion = "Sud-Ouest / Rhône-Alpes";
+      detectedProd = 1250;
+    } else if (lat > 48.2 || [75, 77, 78, 91, 92, 93, 94, 95, 59, 62, 80, 60, 02].includes(dept)) {
+      detectedRegion = "Île-de-France / Nord";
+      detectedProd = 950;
+    }
+
+    setRegion(detectedRegion);
+    setProductible(detectedProd);
   };
 
-  const productible = facteursRegion[region] || 1000;
+  // Cálculos Técnicos e Financeiros
   const productionEstimee = puissanceKw * productible;
   const prixKwhAchat = 0.25;
   const partAutoconsommation = 0.7;
@@ -75,6 +144,7 @@ export default function Home() {
           nom: nomClient,
           email: emailClient,
           telephone: telClient,
+          adresse: selectedAddress ? selectedAddress.label : addressInput,
           region,
           puissance_kw: puissanceKw,
           economie_annuelle: Math.round(economieAnnuelle),
@@ -88,9 +158,12 @@ export default function Home() {
       setIsSaving(false);
     }
 
-    // Geração do PDF
+    // ==========================================
+    // GERAÇÃO DO DOSSIER COMPLETO DE 5 PÁGINAS
+    // ==========================================
     const doc = new jsPDF();
     const dateJour = new Date().toLocaleDateString("fr-FR");
+    const adresseAffichee = selectedAddress ? selectedAddress.label : addressInput || "Adresse non spécifiée";
 
     const renderFooter = (pageNumber: number) => {
       doc.setFontSize(7.5);
@@ -118,7 +191,7 @@ export default function Home() {
       doc.text(subtitle, 150, 23);
     };
 
-    // Página 1
+    // Página 1 (Capa)
     doc.setFillColor(15, 23, 42);
     doc.rect(0, 0, 210, 297, "F");
     doc.setFillColor(37, 99, 235);
@@ -147,29 +220,30 @@ export default function Home() {
 
     doc.setFillColor(30, 41, 59);
     doc.setDrawColor(51, 65, 85);
-    doc.roundedRect(25, 175, 160, 45, 4, 4, "FD");
+    doc.roundedRect(25, 175, 160, 52, 4, 4, "FD");
 
     doc.setTextColor(59, 130, 246);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
-    doc.text("BÉNÉFICIAIRE DE L'ÉTUDE", 32, 187);
+    doc.text("BÉNÉFICIAIRE & LOCALISATION DU PROJET", 32, 186);
 
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(10.5);
-    doc.text(`Nom / Titulaire : ${nomClient}`, 32, 196);
+    doc.text(`Nom / Titulaire : ${nomClient}`, 32, 195);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(203, 213, 225);
-    doc.text(`Contact : ${emailClient}  |  ${telClient || "Non renseigné"}`, 32, 204);
-    doc.text(`Secteur : ${region}`, 32, 212);
+    doc.text(`Adresse : ${adresseAffichee}`, 32, 203);
+    doc.text(`Contact : ${emailClient}  |  ${telClient || "Non renseigné"}`, 32, 211);
+    doc.text(`Zone climatique : ${region} (${productible} kWh/kWc/an)`, 32, 219);
 
     doc.setFontSize(8.5);
     doc.setTextColor(148, 163, 184);
     doc.text(`Date d'émission : ${dateJour}`, 25, 260);
     doc.text("Rapport d'audit préliminaire généré automatiquement", 25, 266);
 
-    // Página 2
+    // Página 2 (Técnica)
     doc.addPage();
     renderHeader("SYNTHÈSE DU PROJET", "Étape 1 sur 4");
     doc.setTextColor(15, 23, 42);
@@ -179,48 +253,50 @@ export default function Home() {
 
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(14, 52, 182, 60, 3, 3, "FD");
+    doc.roundedRect(14, 52, 182, 65, 3, 3, "FD");
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(71, 85, 105);
-    doc.text("• Puissance crête sélectionnée :", 20, 64);
-    doc.text("• Surface de toiture requise :", 20, 75);
-    doc.text("• Estimation du gisement solaire :", 20, 86);
-    doc.text("• Production annuelle estimée :", 20, 97);
+    doc.text("• Adresse d'implantation :", 20, 62);
+    doc.text("• Puissance crête sélectionnée :", 20, 72);
+    doc.text("• Surface de toiture requise :", 20, 82);
+    doc.text("• Gisement solaire régional :", 20, 92);
+    doc.text("• Production annuelle estimée :", 20, 102);
 
     doc.setFont("helvetica", "bold");
     doc.setTextColor(15, 23, 42);
-    doc.text(`${puissanceKw} kWc (${puissanceKw === 3 ? "6-8" : puissanceKw === 6 ? "12-16" : "18-24"} modules)`, 100, 64);
-    doc.text(`env. ${puissanceKw * 5} m2 de toiture`, 100, 75);
-    doc.text(`${productible} kWh/kWc/an (${region})`, 100, 86);
+    doc.text(`${adresseAffichee}`, 95, 62);
+    doc.text(`${puissanceKw} kWc (${puissanceKw === 3 ? "6-8" : puissanceKw === 6 ? "12-16" : "18-24"} modules)`, 95, 72);
+    doc.text(`env. ${puissanceKw * 5} m2 de toiture`, 95, 82);
+    doc.text(`${productible} kWh/kWc/an (${region})`, 95, 92);
     doc.setTextColor(16, 185, 129);
-    doc.text(`${Math.round(productionEstimee)} kWh / an`, 100, 97);
+    doc.text(`${Math.round(productionEstimee)} kWh / an`, 95, 102);
 
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.text("2. Bilan Écologique & Décarbonation", 14, 126);
+    doc.text("2. Bilan Écologique & Décarbonation", 14, 130);
 
     doc.setFillColor(236, 253, 245);
     doc.setDrawColor(16, 185, 129);
-    doc.roundedRect(14, 132, 182, 38, 3, 3, "FD");
+    doc.roundedRect(14, 136, 182, 38, 3, 3, "FD");
 
     doc.setTextColor(5, 150, 105);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
-    doc.text("RÉDUCTION DE L'EMPREINTE CARBONE", 20, 142);
+    doc.text("RÉDUCTION DE L'EMPREINTE CARBONE", 20, 146);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(71, 85, 105);
-    doc.text("Grâce à la production décarbonée de votre centrale solaire, vous évitez :", 20, 151);
+    doc.text("Grâce à la production décarbonée de votre centrale solaire, vous évitez :", 20, 155);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(5, 150, 105);
-    doc.text(`env. ${co2EviteKg} kg de CO2 par an (soit ${(co2EviteKg * 20 / 1000).toFixed(1)} tonnes de CO2 évitées sur 20 ans).`, 20, 160);
+    doc.text(`env. ${co2EviteKg} kg de CO2 par an (soit ${(co2EviteKg * 20 / 1000).toFixed(1)} tonnes de CO2 évitées sur 20 ans).`, 20, 164);
     renderFooter(2);
 
-    // Página 3
+    // Página 3 (Financeira)
     doc.addPage();
     renderHeader("ANALYSE FINANCIÈRE", "Étape 2 sur 4");
     doc.setTextColor(15, 23, 42);
@@ -284,7 +360,7 @@ export default function Home() {
     doc.text(`+${Math.round(gain20ans)} €`, 145, 151);
     renderFooter(3);
 
-    // Página 4
+    // Página 4 (Projeção 20 Anos)
     doc.addPage();
     renderHeader("PROJECTION SUR 20 ANS", "Étape 3 sur 4");
     doc.setTextColor(15, 23, 42);
@@ -334,7 +410,7 @@ export default function Home() {
     });
     renderFooter(4);
 
-    // Página 5
+    // Página 5 (Normas)
     doc.addPage();
     renderHeader("HYPOTHÈSES & MÉTHODOLOGIE", "Étape 4 sur 4");
     doc.setTextColor(15, 23, 42);
@@ -377,7 +453,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#fafafa] text-zinc-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
-      {/* Navbar Minimalista B2B com link para /pro */}
+      {/* Top Navbar */}
       <header className="border-b border-zinc-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
@@ -421,11 +497,11 @@ export default function Home() {
           <div className="lg:col-span-7">
             <div className="bg-white border border-zinc-200/80 rounded-2xl p-7 sm:p-8 shadow-sm">
               
-              {/* Stepper Minimalista */}
+              {/* Stepper */}
               <div className="mb-8">
                 <div className="flex justify-between items-center mb-2.5 text-xs font-semibold">
                   <span className={currentStep >= 1 ? "text-blue-600" : "text-zinc-400"}>
-                    01. Logement
+                    01. Adresse & Logement
                   </span>
                   <span className={currentStep >= 2 ? "text-blue-600" : "text-zinc-400"}>
                     02. Puissance
@@ -444,35 +520,65 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* ETAPA 1 */}
+              {/* ETAPA 1: Endereço Inteligente */}
               {currentStep === 1 && (
                 <div className="space-y-6">
                   <div>
                     <h2 className="text-lg font-bold text-zinc-900 tracking-tight mb-1">
-                      Localisation & Consommation
+                      Adresse du projet
                     </h2>
                     <p className="text-xs text-zinc-500">
-                      Sélectionnez la zone géographique pour ajuster le facteur d&apos;ensoleillement.
+                      Renseignez l&apos;adresse du bien pour calculer automatiquement le gisement solaire précis.
                     </p>
                   </div>
 
-                  <div>
+                  {/* Campo com Autocompletar */}
+                  <div className="relative">
                     <label className="block text-xs font-medium text-zinc-700 mb-2">
-                      Région du projet
+                      Adresse postale complète
                     </label>
-                    <select
-                      value={region}
-                      onChange={(e) => setRegion(e.target.value)}
+                    <input
+                      type="text"
+                      placeholder="Ex: 12 Rue de la Paix 75002 Paris"
+                      value={addressInput}
+                      onChange={(e) => setAddressInput(e.target.value)}
                       className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-4 py-3 text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
-                    >
-                      <option value="Île-de-France / Nord">Île-de-France / Nord (950 kWh/kWc)</option>
-                      <option value="Grand-Est / Centre">Grand-Est / Centre (1 050 kWh/kWc)</option>
-                      <option value="Sud-Ouest / Rhône-Alpes">Sud-Ouest / Rhône-Alpes (1 250 kWh/kWc)</option>
-                      <option value="Provence / PACA / Occitanie">Provence / PACA / Occitanie (1 400 kWh/kWc)</option>
-                    </select>
+                    />
+
+                    {/* Sugestões da API */}
+                    {suggestions.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                        {suggestions.map((s, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => handleSelectAddress(s)}
+                            className="w-full text-left px-4 py-3 text-xs sm:text-sm text-zinc-800 hover:bg-blue-50/80 hover:text-blue-900 border-b border-zinc-100 last:border-b-0 transition flex flex-col"
+                          >
+                            <span className="font-medium text-zinc-900">{s.label}</span>
+                            <span className="text-[11px] text-zinc-400 mt-0.5">{s.context}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  <div>
+                  {/* Detalhes Identificados Automaticamente */}
+                  {selectedAddress && (
+                    <div className="p-4 rounded-xl bg-blue-50/60 border border-blue-100 space-y-2 text-xs">
+                      <div className="flex justify-between items-center text-blue-900 font-medium">
+                        <span>Zone climatique détectée :</span>
+                        <span className="font-bold">{region}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-blue-800/80">
+                        <span>Ensoleillement de référence :</span>
+                        <span className="font-mono font-semibold">{productible} kWh / kWc / an</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Consumo Anual */}
+                  <div className="pt-2">
                     <div className="flex justify-between items-center mb-2">
                       <label className="text-xs font-medium text-zinc-700">
                         Consommation électrique de référence
@@ -509,7 +615,7 @@ export default function Home() {
                 </div>
               )}
 
-              {/* ETAPA 2 */}
+              {/* ETAPA 2: Potência */}
               {currentStep === 2 && (
                 <div className="space-y-6">
                   <div>
@@ -582,7 +688,7 @@ export default function Home() {
                 </div>
               )}
 
-              {/* ETAPA 3 */}
+              {/* ETAPA 3: Coordenadas */}
               {currentStep === 3 && (
                 <div className="space-y-6">
                   <div>
@@ -590,7 +696,7 @@ export default function Home() {
                       Coordonnées & Génération
                     </h2>
                     <p className="text-xs text-zinc-500">
-                      Renseignez vos coordonnées professionnelles pour éditer l&apos;audit complet.
+                      Renseignez vos coordonnées pour éditer l&apos;audit complet intégrant votre adresse.
                     </p>
                   </div>
 
@@ -665,7 +771,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Lado Direito: Dashboard Numérico High-Impact */}
+          {/* Lado Direito: Dashboard Numérico */}
           <div className="lg:col-span-5">
             <div className="bg-white border border-zinc-200/80 rounded-2xl p-7 shadow-sm sticky top-24 space-y-6">
               
@@ -678,7 +784,7 @@ export default function Home() {
                 </h2>
               </div>
 
-              {/* Grid 2x2 com Números Gigantes */}
+              {/* Grid 2x2 de Métricas */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-100">
                   <span className="text-[11px] font-medium text-zinc-500 block mb-1">Production</span>
@@ -713,10 +819,10 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Card Destaque: Ganho em 20 Anos */}
+              {/* Ganho Cumulativo 20 Anos */}
               <div className="p-5 rounded-xl bg-zinc-950 text-white space-y-2">
                 <div className="flex justify-between items-center text-xs text-zinc-400">
-                  <span>Gain cumulé net (20 ans)</span>
+                  <span>Gain cumulé estimé (20 ans)</span>
                   <span className="font-mono text-[10px] bg-zinc-800 px-2 py-0.5 rounded text-zinc-300">Amorti</span>
                 </div>
                 <div className="text-3xl font-black text-white font-mono tracking-tight">
@@ -724,7 +830,7 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Gráfico SVG Minimalista */}
+              {/* Gráfico Minimalista */}
               <div className="pt-2">
                 <div className="flex justify-between text-xs text-zinc-500 mb-2">
                   <span>Trésorerie 20 ans</span>
@@ -768,7 +874,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* SECTION 1: Pourquoi utiliser notre simulateur ? */}
+        {/* Vantagens */}
         <section className="border-t border-zinc-200 pt-16 mb-20">
           <div className="max-w-2xl mb-10">
             <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 block mb-2">
@@ -818,7 +924,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* SECTION 2: Comment ça marche ? */}
+        {/* Como Funciona */}
         <section className="border-t border-zinc-200 pt-16 mb-24">
           <div className="max-w-2xl mb-12">
             <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 block mb-2">
@@ -832,9 +938,9 @@ export default function Home() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm relative">
               <span className="text-xs font-mono font-bold text-blue-600 block mb-3">01</span>
-              <h3 className="text-base font-bold text-zinc-900 mb-2">Vos informations</h3>
+              <h3 className="text-base font-bold text-zinc-900 mb-2">Votre adresse</h3>
               <p className="text-xs text-zinc-500 leading-relaxed">
-                Indiquez votre région géographique et votre niveau de consommation annuelle d&apos;électricité.
+                Indiquez votre adresse pour calculer automatiquement le gisement solaire exact.
               </p>
             </div>
 
@@ -842,7 +948,7 @@ export default function Home() {
               <span className="text-xs font-mono font-bold text-blue-600 block mb-3">02</span>
               <h3 className="text-base font-bold text-zinc-900 mb-2">Simulation</h3>
               <p className="text-xs text-zinc-500 leading-relaxed">
-                L&apos;algorithme calcule le productible solaire optimal en fonction de l&apos;ensoleillement régional.
+                L&apos;algorithme calcule le productible solaire optimal en fonction de votre région.
               </p>
             </div>
 
@@ -864,7 +970,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* SECTION 3: CTA FINAL */}
+        {/* CTA Final */}
         <section className="bg-zinc-950 rounded-3xl p-8 sm:p-14 text-center text-white relative overflow-hidden shadow-xl">
           <div className="relative z-10 max-w-2xl mx-auto space-y-6">
             <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
@@ -886,7 +992,7 @@ export default function Home() {
         </section>
       </main>
 
-      {/* Footer Minimalista */}
+      {/* Footer */}
       <footer className="border-t border-zinc-200 bg-white py-12 mt-20 text-xs text-zinc-400">
         <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="font-medium text-zinc-700">
