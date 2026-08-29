@@ -180,43 +180,42 @@ export default function Home() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Erreur lors de l'analyse");
+        throw new Error(data.error || "Erreur lors de l'analyse.");
       }
 
-      const detectedName = data.nom || "Client Particulier";
-      const detectedAddress = data.adresse || "";
-      const detectedConso = data.conso || 4800;
-
-      setNomClient(detectedName);
-      if (detectedAddress) setAddressInput(detectedAddress);
-      setConsoAnnuelle(detectedConso);
-
-      if (detectedAddress) {
+      // Aplicação dos valores se encontrados
+      if (data.nom) setNomClient(data.nom);
+      if (data.adresse) {
+        setAddressInput(data.adresse);
+        // Tenta geocodificar o endereço encontrado
         try {
           const geoRes = await fetch(
-            `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(detectedAddress)}&limit=1`
+            `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(data.adresse)}&limit=1`
           );
           const geoData = await geoRes.json();
           if (geoData.features && geoData.features.length > 0) {
             handleSelectAddress(geoData.features[0]);
           }
-        } catch (err) {
-          console.warn(err);
+        } catch (geoErr) {
+          console.warn("Geocodage auto ignoré:", geoErr);
         }
       }
 
-      const recKw = detectedConso <= 4000 ? 3 : detectedConso <= 8000 ? 6 : 9;
-      handlePuissanceChange(recKw);
+      if (typeof data.conso === "number" && data.conso > 0) {
+        setConsoAnnuelle(data.conso);
+        const recKw = data.conso <= 4000 ? 3 : data.conso <= 8000 ? 6 : 9;
+        handlePuissanceChange(recKw);
+      }
 
       setExtractedBillData({
-        nom: detectedName,
-        adresse: detectedAddress,
-        conso: detectedConso,
-        puissanceRec: recKw,
+        nom: data.nom || "Non détecté",
+        adresse: data.adresse || "Non détectée",
+        conso: data.conso || undefined,
+        puissanceRec: data.conso ? (data.conso <= 4000 ? 3 : data.conso <= 8000 ? 6 : 9) : undefined,
       });
     } catch (err: any) {
       console.error("Erreur lecture facture:", err);
-      alert(`Échec de l'extraction : ${err.message || "Vérifiez la clé API ou le format du fichier."}`);
+      alert(`Échec de l'analyse : ${err.message || "Impossible de lire le document."}`);
     } finally {
       setIsParsingBill(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
