@@ -150,24 +150,28 @@ export default function Home() {
     }
   };
 
-  const productionEstimee = puissanceKw * productible;
-  const prixKwhAchat = 0.25;
-  const partAutoconsommation = 0.7;
-  const tarifRachatSurplus = 0.13;
+  // Motor de cálculo paramétrico para qualquer potência
+  const calculateScenario = (kw: number, customCost?: number) => {
+    const cost = customCost ?? (kw === 3 ? 7500 : kw === 6 ? 13000 : 18000);
+    const prod = kw * productible;
+    const prixKwhAchat = 0.25;
+    const partAutoconso = 0.7;
+    const tarifRachatSurplus = 0.13;
 
-  const economieAutoconsommation =
-    Math.min(productionEstimee * partAutoconsommation, consoAnnuelle) * prixKwhAchat;
-  const venteSurplus =
-    Math.max(0, productionEstimee - productionEstimee * partAutoconsommation) *
-    tarifRachatSurplus;
-  const economieAnnuelle = economieAutoconsommation + venteSurplus;
+    const ecoAutoconso = Math.min(prod * partAutoconso, consoAnnuelle) * prixKwhAchat;
+    const vente = Math.max(0, prod - prod * partAutoconso) * tarifRachatSurplus;
+    const ecoAnnuelle = ecoAutoconso + vente;
+    const roi = ecoAnnuelle > 0 ? (cost / ecoAnnuelle).toFixed(1) : "N/A";
+    const gain20 = ecoAnnuelle * 20 - cost;
+    const co2 = Math.round(prod * 0.05);
 
-  const payback =
-    economieAnnuelle > 0
-      ? (coutInstallation / economieAnnuelle).toFixed(1)
-      : "N/A";
-  const gain20ans = economieAnnuelle * 20 - coutInstallation;
-  const co2EviteKg = Math.round(productionEstimee * 0.05);
+    return { kw, cost, prod, ecoAnnuelle, roi, gain20, co2 };
+  };
+
+  const currentScenario = calculateScenario(puissanceKw, coutInstallation);
+  const scenario3k = calculateScenario(3, 7500);
+  const scenario6k = calculateScenario(6, 13000);
+  const scenario9k = calculateScenario(9, 18000);
 
   const handleShowResultOnly = async () => {
     if (!nomClient.trim() || !emailClient.trim()) {
@@ -191,8 +195,8 @@ export default function Home() {
           societe: companyConfig.companyName || "SOLAR ENERGIE",
           productible_pvgis: productible,
           puissance_kw: puissanceKw,
-          economie_annuelle: Math.round(economieAnnuelle),
-          gain_20ans: Math.round(gain20ans),
+          economie_annuelle: Math.round(currentScenario.ecoAnnuelle),
+          gain_20ans: Math.round(currentScenario.gain20),
         }),
       });
       setShowOnePageResult(true);
@@ -206,7 +210,7 @@ export default function Home() {
     }
   };
 
-  // GERAÇÃO DO PDF WHITE-LABEL COMPLETO
+  // GERAÇÃO DO PDF WHITE-LABEL COMPLETO COM COMPARATIVO
   const handleDownloadPdf = () => {
     setIsGeneratingPdf(true);
 
@@ -247,7 +251,7 @@ export default function Home() {
       doc.text(subtitle, 145, 23);
     };
 
-    // Página 1 (Capa White-Label)
+    // Página 1 (Capa)
     doc.setFillColor(15, 23, 42);
     doc.rect(0, 0, 210, 297, "F");
     doc.setFillColor(37, 99, 235);
@@ -289,7 +293,7 @@ export default function Home() {
     doc.setFontSize(11);
     doc.setTextColor(203, 213, 225);
     doc.setFont("helvetica", "normal");
-    doc.text("Dimensionnement technique, rentabilité prévisionnelle & bilan carbone", 25, 134);
+    doc.text("Dimensionnement technique, rentabilité prévisionnelle & comparatif de puissance", 25, 134);
 
     doc.setFillColor(30, 41, 59);
     doc.setDrawColor(51, 65, 85);
@@ -325,7 +329,7 @@ export default function Home() {
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.text("1. Caractéristiques Techniques de l'Installation", 14, 46);
+    doc.text("1. Caractéristiques de l'Option Retenue", 14, 46);
 
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);
@@ -347,7 +351,7 @@ export default function Home() {
     doc.text(`env. ${puissanceKw * 5} m2 de toiture`, 95, 82);
     doc.text(`${productible} kWh/kWc/an (Base JRC PVGIS)`, 95, 92);
     doc.setTextColor(16, 185, 129);
-    doc.text(`${Math.round(productionEstimee)} kWh / an`, 95, 102);
+    doc.text(`${Math.round(currentScenario.prod)} kWh / an`, 95, 102);
 
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
@@ -369,71 +373,82 @@ export default function Home() {
     doc.text("Grâce à la production décarbonée de votre centrale solaire, vous évitez :", 20, 155);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(5, 150, 105);
-    doc.text(`env. ${co2EviteKg} kg de CO2 par an (soit ${(co2EviteKg * 20 / 1000).toFixed(1)} tonnes de CO2 évitées sur 20 ans).`, 20, 164);
+    doc.text(`env. ${currentScenario.co2} kg de CO2 par an (soit ${(currentScenario.co2 * 20 / 1000).toFixed(1)} tonnes de CO2 évitées sur 20 ans).`, 20, 164);
     renderFooter(2);
 
-    // Página 3 (Financeira)
+    // Página 3 (Comparativo de 3 Cenários)
     doc.addPage();
-    renderHeader("ANALYSE FINANCIÈRE", "Étape 2 sur 4");
+    renderHeader("ANALYSE COMPARATIVE DES SCÉNARIOS", "Étape 2 sur 4");
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.text("Synthèse des Flux Économiques", 14, 46);
+    doc.text("Comparatif Financier & Énergétique Multi-Options", 14, 46);
 
-    doc.setFillColor(248, 250, 252);
-    doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(14, 54, 56, 35, 3, 3, "FD");
-    doc.setTextColor(100, 116, 139);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.text("INVESTISSEMENT ESTIMÉ", 18, 64);
-    doc.setFontSize(12.5);
-    doc.setTextColor(15, 23, 42);
-    doc.text(`${coutInstallation} € TTC`, 18, 77);
+    // Tabela Comparativa de 3 Colunas no PDF
+    const startY = 56;
+    const colWidth = 58;
 
-    doc.setFillColor(236, 253, 245);
-    doc.setDrawColor(16, 185, 129);
-    doc.roundedRect(77, 54, 56, 35, 3, 3, "FD");
-    doc.setTextColor(5, 150, 105);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.text("ÉCONOMIE ANNUELLE", 81, 64);
-    doc.setFontSize(12.5);
-    doc.text(`env. ${Math.round(economieAnnuelle)} €/an`, 81, 77);
+    const scenarios = [
+      { name: "OPTION A (3 kWc)", s: scenario3k, isCurrent: puissanceKw === 3 },
+      { name: "OPTION B (6 kWc)", s: scenario6k, isCurrent: puissanceKw === 6 },
+      { name: "OPTION C (9 kWc)", s: scenario9k, isCurrent: puissanceKw === 9 },
+    ];
 
-    doc.setFillColor(254, 243, 199);
-    doc.setDrawColor(245, 158, 11);
-    doc.roundedRect(140, 54, 56, 35, 3, 3, "FD");
-    doc.setTextColor(180, 83, 9);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.text("RETOUR ESTIMÉ", 144, 64);
-    doc.setFontSize(12.5);
-    doc.text(`${payback} ans`, 144, 77);
+    scenarios.forEach((sc, i) => {
+      const posX = 14 + i * 62;
+      
+      doc.setFillColor(sc.isCurrent ? 239 : 248, sc.isCurrent ? 246 : 250, sc.isCurrent ? 255 : 252);
+      doc.setDrawColor(sc.isCurrent ? 37 : 226, sc.isCurrent ? 99 : 232, sc.isCurrent ? 235 : 240);
+      doc.roundedRect(posX, startY, colWidth, 120, 3, 3, "FD");
 
-    doc.setTextColor(15, 23, 42);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text("Détail des Économies Annuelles Estimées :", 14, 106);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(sc.isCurrent ? 37 : 15, sc.isCurrent ? 99 : 23, sc.isCurrent ? 235 : 42);
+      doc.text(sc.name, posX + 5, startY + 10);
+      if (sc.isCurrent) {
+        doc.setFontSize(7);
+        doc.setTextColor(16, 185, 129);
+        doc.text("★ Choix retenu", posX + 5, startY + 16);
+      }
 
-    doc.setFillColor(248, 250, 252);
-    doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(14, 112, 182, 50, 3, 3, "FD");
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(71, 85, 105);
-    doc.text("• Économies sur facture (Autoconsommation directe ~70%) :", 20, 125);
-    doc.text("• Revente du surplus (Tarif garanti EDF OA ~0,13 €/kWh) :", 20, 137);
+      doc.text("Investissement :", posX + 5, startY + 28);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.text(`${sc.s.cost.toLocaleString("fr-FR")} € TTC`, posX + 5, startY + 35);
 
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(15, 23, 42);
-    doc.text(`env. ${Math.round(economieAutoconsommation)} € / an`, 145, 125);
-    doc.text(`env. ${Math.round(venteSurplus)} € / an`, 145, 137);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 116, 139);
+      doc.text("Production annuelle :", posX + 5, startY + 47);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.text(`${Math.round(sc.s.prod).toLocaleString("fr-FR")} kWh/an`, posX + 5, startY + 54);
 
-    doc.text("• Gain cumulé estimé sur 20 ans :", 20, 151);
-    doc.setTextColor(67, 56, 202);
-    doc.text(`+${Math.round(gain20ans)} €`, 145, 151);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 116, 139);
+      doc.text("Économies estimées :", posX + 5, startY + 66);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(37, 99, 235);
+      doc.text(`~${Math.round(sc.s.ecoAnnuelle).toLocaleString("fr-FR")} €/an`, posX + 5, startY + 73);
+
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 116, 139);
+      doc.text("Retour brut (ROI) :", posX + 5, startY + 85);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      doc.text(`${sc.s.roi} ans`, posX + 5, startY + 92);
+
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 116, 139);
+      doc.text("Bilan Net (20 ans) :", posX + 5, startY + 104);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(16, 185, 129);
+      doc.text(`+${Math.round(sc.s.gain20).toLocaleString("fr-FR")} €`, posX + 5, startY + 111);
+    });
+
     renderFooter(3);
 
     // Página 4 (Projeção 20 Anos)
@@ -459,7 +474,7 @@ export default function Home() {
     let posY = 71;
 
     jalons.forEach((an, idx) => {
-      const cumul = economieAnnuelle * an - coutInstallation;
+      const cumul = currentScenario.ecoAnnuelle * an - coutInstallation;
       if (idx % 2 === 0) {
         doc.setFillColor(248, 250, 252);
         doc.rect(14, posY - 5, 182, 8, "F");
@@ -470,8 +485,8 @@ export default function Home() {
       doc.setTextColor(71, 85, 105);
 
       doc.text(`Année ${an}`, 20, posY);
-      doc.text(`${Math.round(productionEstimee)} kWh`, 60, posY);
-      doc.text(`+${Math.round(economieAnnuelle * an)} €`, 105, posY);
+      doc.text(`${Math.round(currentScenario.prod)} kWh`, 60, posY);
+      doc.text(`+${Math.round(currentScenario.ecoAnnuelle * an)} €`, 105, posY);
 
       if (cumul >= 0) {
         doc.setFont("helvetica", "bold");
@@ -567,9 +582,9 @@ export default function Home() {
 
       {/* Main Container */}
       <main className="max-w-6xl mx-auto px-6 py-12">
-        {/* TELA DE RESULTADO EM 1 PÁGINA */}
+        {/* TELA DE RESULTADO EM 1 PÁGINA COM COMPARATIVO 3 CENÁRIOS */}
         {showOnePageResult ? (
-          <div className="max-w-4xl mx-auto bg-white border border-zinc-200 rounded-3xl p-8 sm:p-12 shadow-sm mb-16 animate-in fade-in duration-300">
+          <div className="max-w-5xl mx-auto bg-white border border-zinc-200 rounded-3xl p-8 sm:p-12 shadow-sm mb-16 animate-in fade-in duration-300">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-100 pb-8 mb-8 gap-4">
               <div>
                 <span className="text-xs font-mono uppercase tracking-wider text-blue-600 font-semibold block mb-1">
@@ -583,72 +598,115 @@ export default function Home() {
                 </p>
               </div>
               <div className="bg-zinc-950 text-white px-5 py-3 rounded-2xl text-center sm:text-right shadow-sm">
-                <span className="text-[10px] text-zinc-400 uppercase font-mono block">Puissance cible</span>
+                <span className="text-[10px] text-zinc-400 uppercase font-mono block">Option active</span>
                 <span className="text-2xl font-black text-blue-400 font-mono">{puissanceKw} kWc</span>
               </div>
             </div>
 
-            {/* Grid dos 4 Grandes Resultados */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-8">
-              <div className="p-6 rounded-2xl bg-zinc-50 border border-zinc-200/80">
-                <div className="flex items-center gap-2 text-zinc-500 text-xs font-semibold mb-2">
-                  <span>☀️</span>
-                  <span>Production estimée</span>
+            {/* SEÇÃO 1: OS 4 GRANDES RESULTADOS DA OPÇÃO SELECIONADA */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+              <div className="p-5 rounded-2xl bg-zinc-50 border border-zinc-200/80">
+                <span className="text-xs text-zinc-500 block mb-1">☀️ Production</span>
+                <div className="text-2xl font-black text-zinc-950 font-mono">
+                  {Math.round(currentScenario.prod).toLocaleString("fr-FR")} <span className="text-xs font-normal text-zinc-400">kWh/an</span>
                 </div>
-                <div className="text-3xl sm:text-4xl font-black text-zinc-950 font-mono tracking-tight">
-                  {Math.round(productionEstimee).toLocaleString("fr-FR")} <span className="text-lg font-normal text-zinc-500">kWh/an</span>
-                </div>
-                <p className="text-[11px] text-zinc-400 mt-2">
-                  Calculé selon l&apos;ensoleillement réel PVGIS ({productible} kWh/kWc/an)
-                </p>
               </div>
 
-              <div className="p-6 rounded-2xl bg-blue-50/50 border border-blue-100">
-                <div className="flex items-center gap-2 text-blue-700 text-xs font-semibold mb-2">
-                  <span>💰</span>
-                  <span>Économies estimées</span>
+              <div className="p-5 rounded-2xl bg-blue-50/60 border border-blue-100">
+                <span className="text-xs text-blue-700 block mb-1">💰 Économies</span>
+                <div className="text-2xl font-black text-blue-600 font-mono">
+                  ~{Math.round(currentScenario.ecoAnnuelle).toLocaleString("fr-FR")} <span className="text-xs font-normal text-blue-400">€/an</span>
                 </div>
-                <div className="text-3xl sm:text-4xl font-black text-blue-600 font-mono tracking-tight">
-                  ~{Math.round(economieAnnuelle).toLocaleString("fr-FR")} <span className="text-lg font-normal text-blue-600/70">€/an</span>
-                </div>
-                <p className="text-[11px] text-blue-600/80 mt-2">
-                  Autoconsommation directe (~70%) + revente du surplus EDF OA
-                </p>
               </div>
 
-              <div className="p-6 rounded-2xl bg-zinc-50 border border-zinc-200/80">
-                <div className="flex items-center gap-2 text-zinc-500 text-xs font-semibold mb-2">
-                  <span>📈</span>
-                  <span>Retour sur investissement</span>
+              <div className="p-5 rounded-2xl bg-zinc-50 border border-zinc-200/80">
+                <span className="text-xs text-zinc-500 block mb-1">📈 Retour brut</span>
+                <div className="text-2xl font-black text-zinc-950 font-mono">
+                  {currentScenario.roi} <span className="text-xs font-normal text-zinc-400">ans</span>
                 </div>
-                <div className="text-3xl sm:text-4xl font-black text-zinc-950 font-mono tracking-tight">
-                  {payback} <span className="text-lg font-normal text-zinc-500">ans</span>
-                </div>
-                <p className="text-[11px] text-zinc-400 mt-2">
-                  Investissement indicatif de {coutInstallation.toLocaleString("fr-FR")} € TTC
-                </p>
               </div>
 
-              <div className="p-6 rounded-2xl bg-emerald-50/50 border border-emerald-100">
-                <div className="flex items-center gap-2 text-emerald-700 text-xs font-semibold mb-2">
-                  <span>🌱</span>
-                  <span>CO₂ évité</span>
+              <div className="p-5 rounded-2xl bg-emerald-50/60 border border-emerald-100">
+                <span className="text-xs text-emerald-700 block mb-1">🌱 CO₂ évité</span>
+                <div className="text-2xl font-black text-emerald-600 font-mono">
+                  {currentScenario.co2} <span className="text-xs font-normal text-emerald-500">kg/an</span>
                 </div>
-                <div className="text-3xl sm:text-4xl font-black text-emerald-600 font-mono tracking-tight">
-                  {co2EviteKg} <span className="text-lg font-normal text-emerald-600/70">kg/an</span>
-                </div>
-                <p className="text-[11px] text-emerald-600/80 mt-2">
-                  Soit {(co2EviteKg * 20 / 1000).toFixed(1)} tonnes de CO₂ évitées sur 20 ans
-                </p>
+              </div>
+            </div>
+
+            {/* SEÇÃO 2: TABELA COMPARATIVA DE 3 CENÁRIOS (3 kWc vs 6 kWc vs 9 kWc) */}
+            <div className="mb-10">
+              <h3 className="text-lg font-bold text-zinc-950 tracking-tight mb-4 flex items-center gap-2">
+                <span>Comparatif des 3 scénarios de puissance</span>
+                <span className="text-xs font-normal text-zinc-400 font-mono">(Données PVGIS)</span>
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {[
+                  { title: "OPTION A", kw: 3, s: scenario3k },
+                  { title: "OPTION B (Recommandé)", kw: 6, s: scenario6k },
+                  { title: "OPTION C", kw: 9, s: scenario9k },
+                ].map((item) => {
+                  const isSelected = puissanceKw === item.kw;
+                  return (
+                    <div
+                      key={item.kw}
+                      onClick={() => handlePuissanceChange(item.kw)}
+                      className={`p-6 rounded-2xl border cursor-pointer transition-all ${
+                        isSelected
+                          ? "bg-blue-50/50 border-blue-600 shadow-sm ring-2 ring-blue-600/20"
+                          : "bg-white border-zinc-200 hover:border-zinc-300"
+                      }`}
+                    >
+                      <div className="flex justify-between items-center mb-3">
+                        <span className={`text-xs font-bold ${isSelected ? "text-blue-600" : "text-zinc-500"}`}>
+                          {item.title}
+                        </span>
+                        {isSelected && (
+                          <span className="text-[10px] bg-blue-600 text-white font-medium px-2 py-0.5 rounded-full">
+                            Sélectionné
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="text-3xl font-black text-zinc-950 font-mono mb-4">
+                        {item.kw} <span className="text-sm font-normal text-zinc-500">kWc</span>
+                      </div>
+
+                      <div className="space-y-2.5 text-xs border-t border-zinc-100 pt-3">
+                        <div className="flex justify-between text-zinc-600">
+                          <span>Investissement TTC :</span>
+                          <span className="font-bold text-zinc-900 font-mono">{item.s.cost.toLocaleString("fr-FR")} €</span>
+                        </div>
+                        <div className="flex justify-between text-zinc-600">
+                          <span>Production estimée :</span>
+                          <span className="font-bold text-zinc-900 font-mono">{Math.round(item.s.prod).toLocaleString("fr-FR")} kWh</span>
+                        </div>
+                        <div className="flex justify-between text-zinc-600">
+                          <span>Économies / an :</span>
+                          <span className="font-bold text-blue-600 font-mono">~{Math.round(item.s.ecoAnnuelle).toLocaleString("fr-FR")} €</span>
+                        </div>
+                        <div className="flex justify-between text-zinc-600">
+                          <span>Retour brut :</span>
+                          <span className="font-bold text-zinc-900 font-mono">{item.s.roi} ans</span>
+                        </div>
+                        <div className="flex justify-between text-zinc-600 pt-2 border-t border-zinc-100">
+                          <span>Gain Net (20 ans) :</span>
+                          <span className="font-bold text-emerald-600 font-mono">+{Math.round(item.s.gain20).toLocaleString("fr-FR")} €</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
             {/* Bilan 20 ans & Botão de Download */}
             <div className="p-6 rounded-2xl bg-zinc-950 text-white mb-8 flex flex-col sm:flex-row justify-between items-center gap-4">
               <div>
-                <p className="text-xs text-zinc-400 uppercase font-mono">Gain financier cumulé estimé</p>
+                <p className="text-xs text-zinc-400 uppercase font-mono">Gain financier cumulé de l&apos;option {puissanceKw} kWc</p>
                 <p className="text-2xl sm:text-3xl font-black text-white font-mono mt-0.5">
-                  +{Math.round(gain20ans).toLocaleString("fr-FR")} € <span className="text-xs font-normal text-emerald-400 font-sans">sur 20 ans</span>
+                  +{Math.round(currentScenario.gain20).toLocaleString("fr-FR")} € <span className="text-xs font-normal text-emerald-400 font-sans">sur 20 ans</span>
                 </p>
               </div>
 
@@ -657,7 +715,7 @@ export default function Home() {
                 disabled={isGeneratingPdf}
                 className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 active:scale-[0.99] text-white font-semibold py-3.5 px-6 rounded-xl transition text-sm shadow-md cursor-pointer"
               >
-                {isGeneratingPdf ? "Édition en cours..." : "Télécharger l'étude PDF (5 pages) →"}
+                {isGeneratingPdf ? "Édition du rapport..." : "Télécharger l'étude PDF avec Comparatif (5 pages) →"}
               </button>
             </div>
 
@@ -669,7 +727,7 @@ export default function Home() {
                 }}
                 className="text-xs text-zinc-500 hover:text-zinc-900 font-medium underline underline-offset-4 cursor-pointer"
               >
-                ← Réaliser une nouvelle simulation
+                ← Modifier les paramètres de la simulation
               </button>
             </div>
           </div>
@@ -683,7 +741,7 @@ export default function Home() {
                 Étude photovoltaïque de précision.
               </h1>
               <p className="text-zinc-500 text-base leading-relaxed">
-                Chiffrez votre rentabilité sur base satellitaire réelle et éditez votre dossier complet d&apos;ingénierie certifié.
+                Chiffrez votre rentabilité sur base satellitaire réelle et comparez les scénarios de puissance instantanément.
               </p>
             </div>
 
@@ -888,7 +946,7 @@ export default function Home() {
                           Vos coordonnées
                         </h2>
                         <p className="text-xs text-zinc-500">
-                          Renseignez vos coordonnées pour afficher le bilan et éditer l&apos;étude.
+                          Renseignez vos coordonnées pour afficher le comparatif complet en 1 page.
                         </p>
                       </div>
 
@@ -955,7 +1013,7 @@ export default function Home() {
                           disabled={isSaving}
                           className="bg-blue-600 hover:bg-blue-700 active:scale-[0.99] disabled:opacity-50 text-white font-semibold py-2.5 px-6 rounded-xl transition text-sm cursor-pointer shadow-sm"
                         >
-                          {isSaving ? "Chargement..." : "Afficher mon Résultat →"}
+                          {isSaving ? "Chargement..." : "Afficher le Comparatif →"}
                         </button>
                       </div>
                     </div>
@@ -984,7 +1042,7 @@ export default function Home() {
                     <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-100">
                       <span className="text-[11px] font-medium text-zinc-500 block mb-1">Production</span>
                       <div className="text-2xl font-black text-zinc-950 font-mono tracking-tight">
-                        {Math.round(productionEstimee).toLocaleString("fr-FR")}
+                        {Math.round(currentScenario.prod).toLocaleString("fr-FR")}
                       </div>
                       <span className="text-[10px] text-zinc-400">kWh / an</span>
                     </div>
@@ -992,7 +1050,7 @@ export default function Home() {
                     <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-100">
                       <span className="text-[11px] font-medium text-zinc-500 block mb-1">Économies</span>
                       <div className="text-2xl font-black text-blue-600 font-mono tracking-tight">
-                        ~{Math.round(economieAnnuelle).toLocaleString("fr-FR")} €
+                        ~{Math.round(currentScenario.ecoAnnuelle).toLocaleString("fr-FR")} €
                       </div>
                       <span className="text-[10px] text-zinc-400">par an</span>
                     </div>
@@ -1000,7 +1058,7 @@ export default function Home() {
                     <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-100">
                       <span className="text-[11px] font-medium text-zinc-500 block mb-1">Retour brut</span>
                       <div className="text-2xl font-black text-zinc-950 font-mono tracking-tight">
-                        {payback}
+                        {currentScenario.roi}
                       </div>
                       <span className="text-[10px] text-zinc-400">années</span>
                     </div>
@@ -1008,7 +1066,7 @@ export default function Home() {
                     <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-100">
                       <span className="text-[11px] font-medium text-zinc-500 block mb-1">CO₂ évité</span>
                       <div className="text-2xl font-black text-emerald-600 font-mono tracking-tight">
-                        {co2EviteKg}
+                        {currentScenario.co2}
                       </div>
                       <span className="text-[10px] text-zinc-400">kg / an</span>
                     </div>
@@ -1020,31 +1078,7 @@ export default function Home() {
                       <span className="font-mono text-[10px] bg-zinc-800 px-2 py-0.5 rounded text-zinc-300">Amorti</span>
                     </div>
                     <div className="text-3xl font-black text-white font-mono tracking-tight">
-                      +{Math.round(gain20ans).toLocaleString("fr-FR")} €
-                    </div>
-                  </div>
-
-                  <div className="pt-2">
-                    <div className="flex justify-between text-xs text-zinc-500 mb-2">
-                      <span>Trésorerie 20 ans</span>
-                      <span className="font-mono font-medium text-zinc-700">Seuil : {payback} ans</span>
-                    </div>
-                    <div className="h-20 w-full">
-                      <svg className="w-full h-full overflow-visible" viewBox="0 0 300 70">
-                        <line x1="20" y1="40" x2="295" y2="40" stroke="#e4e4e7" strokeWidth="1" strokeDasharray="3 3" />
-                        <text x="0" y="43" fill="#a1a1aa" fontSize="8" fontFamily="monospace">0€</text>
-                        
-                        <path
-                          d="M 25 60 Q 110 40, 290 10"
-                          fill="none"
-                          stroke="#2563eb"
-                          strokeWidth="2.5"
-                        />
-
-                        <circle cx="25" cy="60" r="3" fill="#f43f5e" />
-                        <circle cx="120" cy="40" r="3.5" fill="#2563eb" stroke="#ffffff" strokeWidth="1.5" />
-                        <circle cx="290" cy="10" r="3.5" fill="#10b981" stroke="#ffffff" strokeWidth="1.5" />
-                      </svg>
+                      +{Math.round(currentScenario.gain20).toLocaleString("fr-FR")} €
                     </div>
                   </div>
                 </div>
@@ -1082,10 +1116,10 @@ export default function Home() {
                 📊
               </div>
               <h3 className="text-base font-bold text-zinc-900 mb-2">
-                Vision financière complète
+                Comparateur 3 Scénarios
               </h3>
               <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
-                Visualisez vos économies d&apos;autoconsommation, vos revenus EDF OA et votre retour sur investissement.
+                Présentez immédiatement les 3 options (3, 6 et 9 kWc) pour maximiser le taux de conversion en rendez-vous.
               </p>
             </div>
 
@@ -1133,9 +1167,9 @@ export default function Home() {
 
             <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm relative">
               <span className="text-xs font-mono font-bold text-blue-600 block mb-3">03</span>
-              <h3 className="text-base font-bold text-zinc-900 mb-2">Résultats</h3>
+              <h3 className="text-base font-bold text-zinc-900 mb-2">Comparatif</h3>
               <p className="text-xs text-zinc-500 leading-relaxed">
-                Découvrez vos indicateurs financiers personnalisés et le bilan carbone.
+                Découvrez le comparatif financier détaillé entre 3, 6 et 9 kWc.
               </p>
             </div>
 
@@ -1143,7 +1177,7 @@ export default function Home() {
               <span className="text-xs font-mono font-bold text-blue-600 block mb-3">04</span>
               <h3 className="text-base font-bold text-zinc-900 mb-2">Étude White-Label</h3>
               <p className="text-xs text-zinc-500 leading-relaxed">
-                Éditez et téléchargez l&apos;étude de 5 pages avec vos propres couleurs et coordonnées.
+                Éditez et téléchargez l&apos;étude de 5 pages certifiée.
               </p>
             </div>
           </div>
@@ -1156,7 +1190,7 @@ export default function Home() {
               Vous envisagez l&apos;installation de panneaux solaires ?
             </h2>
             <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
-              Obtenez une première estimation basée sur les données PVGIS en moins de 60 secondes.
+              Obtenez une première estimation comparative basée sur les données PVGIS en moins de 60 secondes.
             </p>
             <div className="pt-2">
               <a
