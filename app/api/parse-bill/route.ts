@@ -1,52 +1,61 @@
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: "GEMINI_API_KEY non configurée." },
+        { error: "Clé API non configurée." },
         { status: 500 }
       );
     }
 
-    const { text } = await req.json();
+    const formData = await req.formData();
+    const file = formData.get("file") as File;
 
-    if (!text || typeof text !== "string" || text.trim().length === 0) {
-      return NextResponse.json(
-        { error: "Aucun texte extrait du document." },
-        { status: 400 }
-      );
+    if (!file) {
+      return NextResponse.json({ error: "Aucun fichier reçu." }, { status: 400 });
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const arrayBuffer = await file.arrayBuffer();
+    const base64Data = Buffer.from(arrayBuffer).toString("base64");
+    const mimeType = file.type || "application/pdf";
 
-    const prompt = `Vous êtes un système OCR d'extraction de factures d'énergie françaises (EDF, TotalEnergies, Engie, Enedis).
-Analysez le texte suivant issu d'une facture et extrayez STRICTEMENT un objet JSON valide :
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
+
+    const prompt = `Vous êtes un système OCR d'extraction de factures d'énergie en France (EDF, TotalEnergies, Engie, Enedis).
+Extrayez ces 3 informations du document sous forme de JSON strict :
 {
   "nom": string ou null,
   "adresse": string ou null,
   "conso": number ou null
 }
-
 Règles :
-1. "nom" : nom et prénom du titulaire (ex: PIERRE BOKOBZA). Si absent, null.
-2. "adresse" : adresse physique complète du lieu de consommation (rue, code postal, ville). Si absent, null.
-3. "conso" : consommation annuelle en kWh (CAR ou total annuel). Si absent, null.
-Ne renvoyez RIEN d'autre que l'objet JSON.
-
-Texte de la facture :
-"""
-${text.slice(0, 10000)}
-"""`;
+1. "nom" : nom et prénom complets du titulaire.
+2. "adresse" : adresse complète du lieu de consommation (rue, code postal et ville).
+3. "conso" : consommation annuelle réelle en kWh (CAR ou total annuel).
+Ne renvoyez RIEN d'autre que l'objet JSON.`;
 
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: [
+          {
+            parts: [
+              {
+                inline_data: {
+                  mime_type: mimeType,
+                  data: base64Data,
+                },
+              },
+              { text: prompt },
+            ],
+          },
+        ],
         generationConfig: {
           response_mime_type: "application/json",
           temperature: 0.1,
@@ -55,13 +64,17 @@ ${text.slice(0, 10000)}
     });
 
     if (!response.ok) {
-      const err = await response.text();
-      return NextResponse.json({ error: `Erreur API: ${err.slice(0, 100)}` }, { status: 500 });
+      const errorText = await response.text();
+      return NextResponse.json(
+        { error: `Erreur API Google (${response.status}): ${errorText.slice(0, 150)}` },
+        { status: 500 }
+      );
     }
 
     const data = await response.json();
-    const rawJson = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-    const result = JSON.parse(rawJson);
+    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    const result = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
 
     return NextResponse.json({
       nom: result.nom || null,
@@ -70,7 +83,7 @@ ${text.slice(0, 10000)}
     });
   } catch (error: any) {
     return NextResponse.json(
-      { error: error?.message || "Erreur interne" },
+      { error: error?.message || "Erreur lors du traitement du fichier." },
       { status: 500 }
     );
   }
