@@ -4,94 +4,99 @@ import { useState } from "react";
 import jsPDF from "jspdf";
 
 export default function Home() {
-  const [consoAnnuelle, setConsoAnnuelle] = useState<number>(4800);
-  const [prixKwh, setPrixKwh] = useState<number>(0.2516);
-  const [region, setRegion] = useState<string>("Île-de-France / Nord");
-  const [puissanceKw, setPuissanceKw] = useState<number>(3);
-  const [coutInstallation, setCoutInstallation] = useState<number>(7500);
+  const [region, setRegion] = useState("Île-de-France / Nord");
+  const [puissanceKw, setPuissanceKw] = useState(3);
+  const [consoAnnuelle, setConsoAnnuelle] = useState(4800);
+  const [coutInstallation, setCoutInstallation] = useState(7500);
 
-  const [nomClient, setNomClient] = useState<string>("");
-  const [emailClient, setEmailClient] = useState<string>("");
-  const [telClient, setTelClient] = useState<string>("");
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+  const [nomClient, setNomClient] = useState("");
+  const [emailClient, setEmailClient] = useState("");
+  const [telClient, setTelClient] = useState("");
 
-  const facteurRegion: Record<string, number> = {
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const facteursRegion: Record<string, number> = {
     "Île-de-France / Nord": 950,
-    "Ouest / Centre": 1100,
+    "Grand-Est / Centre": 1050,
     "Sud-Ouest / Rhône-Alpes": 1250,
-    "PACA / Occitanie": 1450,
+    "Provence / PACA / Occitanie": 1400,
   };
 
-  const productible = facteurRegion[region] || 1100;
+  const productible = facteursRegion[region] || 1000;
   const productionEstimee = puissanceKw * productible;
+  const prixKwhAchat = 0.25;
+  const partAutoconsommation = 0.7;
+  const tarifRachatSurplus = 0.13;
 
-  const autoConsommee = Math.min(consoAnnuelle * 0.5, productionEstimee * 0.7);
-  const surplusVendu = Math.max(0, productionEstimee - autoConsommee);
-  const gainSurplus = surplusVendu * 0.13;
-  const economieFacture = autoConsommee * prixKwh;
-  const economieAnnuelle = economieFacture + gainSurplus;
+  const economieAutoconsommation =
+    Math.min(productionEstimee * partAutoconsommation, consoAnnuelle) * prixKwhAchat;
+  const venteSurplus =
+    Math.max(0, productionEstimee - productionEstimee * partAutoconsommation) *
+    tarifRachatSurplus;
+  const economieAnnuelle = economieAutoconsommation + venteSurplus;
 
-  const payback = coutInstallation > 0 && economieAnnuelle > 0
-    ? (coutInstallation / economieAnnuelle).toFixed(1)
-    : "0";
+  const payback =
+    economieAnnuelle > 0
+      ? (coutInstallation / economieAnnuelle).toFixed(1)
+      : "N/A";
+  const gain20ans = economieAnnuelle * 20 - coutInstallation;
 
-  const gain20ans = (economieAnnuelle * 20) - coutInstallation;
+  const handlePuissanceChange = (val: number) => {
+    setPuissanceKw(val);
+    if (val === 3) setCoutInstallation(7500);
+    else if (val === 6) setCoutInstallation(13000);
+    else if (val === 9) setCoutInstallation(18000);
+  };
 
   const handleValidationAndPDF = async () => {
-    if (!nomClient || !emailClient) {
-      alert("Veuillez renseigner au moins votre nom et e-mail.");
+    if (!nomClient.trim() || !emailClient.trim()) {
+      setErrorMsg("Veuillez renseigner votre nom et votre adresse e-mail.");
       return;
     }
 
+    setErrorMsg("");
     setIsSaving(true);
     setSaveSuccess(false);
 
     try {
-      const response = await fetch("/api/leads", {
+      await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nom: nomClient,
           email: emailClient,
           telephone: telClient,
-          region: region,
+          region,
           puissance_kw: puissanceKw,
           economie_annuelle: Math.round(economieAnnuelle),
           gain_20ans: Math.round(gain20ans),
         }),
       });
-
-      if (response.ok) {
-        setSaveSuccess(true);
-      } else {
-        console.error("Erreur API:", await response.text());
-      }
-    } catch (err) {
-      console.error("Erreur d'envoi:", err);
+      setSaveSuccess(true);
+    } catch (e) {
+      console.error(e);
     } finally {
       setIsSaving(false);
     }
 
-    // Geração do PDF Profissional com Marca / Instalador
+    // Geração do PDF
     const doc = new jsPDF();
 
-    // 1. Cabeçalho Escuro Moderno
-    doc.setFillColor(15, 23, 42); // Slate 900
+    doc.setFillColor(15, 23, 42);
     doc.rect(0, 0, 210, 42, "F");
 
-    // Identificação da Empresa / Marca no Topo
-    doc.setTextColor(245, 158, 11); // Âmbar
+    doc.setTextColor(245, 158, 11);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.text("SOLAR ENERGIE FRANCE", 14, 16);
 
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(148, 163, 184); // Slate 400
+    doc.setTextColor(148, 163, 184);
     doc.text("Installateur Qualifié RGE QualiPV  •  01 89 00 00 00  •  contact@solarenergie.fr", 14, 23);
 
-    // Título do Relatório
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
@@ -102,7 +107,6 @@ export default function Home() {
     doc.setTextColor(203, 213, 225);
     doc.text(`Rapport émis le : ${new Date().toLocaleDateString("fr-FR")}`, 155, 34);
 
-    // 2. Caixa: Dados do Cliente
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);
     doc.roundedRect(14, 48, 182, 30, 3, 3, "FD");
@@ -120,7 +124,6 @@ export default function Home() {
     doc.text(`Téléphone : ${telClient || "Non renseigné"}`, 105, 64);
     doc.text(`Secteur géographique : ${region}`, 105, 71);
 
-    // 3. Caixa: Configuração Técnica Estimada
     doc.setFillColor(248, 250, 252);
     doc.roundedRect(14, 83, 182, 38, 3, 3, "FD");
 
@@ -132,17 +135,11 @@ export default function Home() {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(71, 85, 105);
+    doc.text(`• Puissance crête : ${puissanceKw} kWc`, 20, 100);
+    doc.text(`• Consommation : ${consoAnnuelle} kWh/an`, 20, 108);
+    doc.text(`• Production annuelle : ${Math.round(productionEstimee)} kWh/an`, 105, 100);
+    doc.text(`• Investissement indicatif : ${coutInstallation} € TTC`, 105, 108);
 
-    // Linha de cima (Y = 101)
-    doc.text(`• Puissance crête : ${puissanceKw} kWc`, 20, 101);
-    doc.text(`• Production annuelle : ${Math.round(productionEstimee)} kWh/an`, 105, 101);
-
-    // Linha de baixo (Y = 111)
-    doc.text(`• Consommation : ${consoAnnuelle} kWh/an`, 20, 111);
-    doc.text(`• Investissement indicatif : ${coutInstallation} € TTC`, 105, 111);
-
-    // 4. Três Cards Financeiros
-    // Card 1: Economia Anual
     doc.setFillColor(236, 253, 245);
     doc.setDrawColor(16, 185, 129);
     doc.roundedRect(14, 127, 56, 30, 3, 3, "FD");
@@ -153,7 +150,6 @@ export default function Home() {
     doc.setFontSize(12.5);
     doc.text(`env. ${Math.round(economieAnnuelle)} € / an`, 18, 147);
 
-    // Card 2: Retorno
     doc.setFillColor(254, 243, 199);
     doc.setDrawColor(245, 158, 11);
     doc.roundedRect(77, 127, 56, 30, 3, 3, "FD");
@@ -164,7 +160,6 @@ export default function Home() {
     doc.setFontSize(12.5);
     doc.text(`${payback} ans`, 81, 147);
 
-    // Card 3: Ganho em 20 anos
     doc.setFillColor(238, 242, 255);
     doc.setDrawColor(99, 102, 241);
     doc.roundedRect(140, 127, 56, 30, 3, 3, "FD");
@@ -175,7 +170,6 @@ export default function Home() {
     doc.setFontSize(12.5);
     doc.text(`+${Math.round(gain20ans)} €`, 144, 147);
 
-    // 5. Bloco de Acompanhamento & Garantias
     doc.setFillColor(241, 245, 249);
     doc.setDrawColor(203, 213, 225);
     doc.roundedRect(14, 164, 182, 48, 3, 3, "FD");
@@ -193,7 +187,6 @@ export default function Home() {
     doc.text("• Éligibilité prime à l'autoconsommation et contrat de rachat EDF OA sur 20 ans.", 20, 196);
     doc.text("• Matériel certifié avec garantie de rendement linéaire jusqu'à 25 ans.", 20, 203);
 
-    // 6. Rodapé com Contato
     doc.setFontSize(7.5);
     doc.setTextColor(148, 163, 184);
     doc.text("Document établi à titre informatif selon les barèmes en vigueur. Non contractuel.", 14, 280);
@@ -203,164 +196,240 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-900 text-slate-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto">
-        <div className="text-center mb-10">
-          <span className="bg-amber-500/10 text-amber-400 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider border border-amber-500/20">
-            Outil Professionnel
-          </span>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-white mt-3">
-            Simulateur Solaire Photovoltaïque ☀️
+    <div className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-amber-500 selection:text-slate-950">
+      {/* Top Navbar */}
+      <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <span className="text-xl">☀️</span>
+            <span className="font-bold tracking-tight text-white text-lg">
+              SOLAR <span className="text-amber-400">ENERGIE</span>
+            </span>
+          </div>
+          <div className="flex items-center space-x-3">
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Certifié RGE QualiPV
+            </span>
+            <span className="text-xs text-slate-400 border border-slate-800 rounded-lg px-2.5 py-1">
+              Barème 2026
+            </span>
+          </div>
+        </div>
+      </header>
+
+      {/* Hero Section */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 mb-4">
+            <span>⚡ Simulateur d&apos;Autoconsommation Photovoltaïque</span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-4 leading-tight">
+            Calculez votre rentabilité solaire en <span className="text-amber-400">60 secondes</span>
           </h1>
-          <p className="mt-2 text-slate-400 text-sm max-w-xl mx-auto">
-            Dimensionnez vos panneaux solaires et calculez la rentabilité financière en moins de 60 secondes.
+          <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
+            Estimez votre production annuelle, vos économies d&apos;électricité et générez votre dossier d&apos;étude complet en PDF instantanément.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-7 bg-slate-800/80 p-6 rounded-2xl border border-slate-700 backdrop-blur-sm space-y-6">
-            <h2 className="text-lg font-semibold text-white border-b border-slate-700 pb-3">
-              1. Paramètres Techniques
-            </h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-300">Région géographique</label>
-                <select
-                  value={region}
-                  onChange={(e) => setRegion(e.target.value)}
-                  className="mt-1 block w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
-                >
-                  <option value="Île-de-France / Nord">Île-de-France / Nord</option>
-                  <option value="Ouest / Centre">Ouest / Centre</option>
-                  <option value="Sud-Ouest / Rhône-Alpes">Sud-Ouest / Rhône-Alpes</option>
-                  <option value="PACA / Occitanie">PACA / Occitanie</option>
-                </select>
+        {/* Grid Container */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Form Side */}
+          <div className="lg:col-span-7 space-y-6">
+            {/* Bloco 1: Paramètres */}
+            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-xl backdrop-blur-sm">
+              <div className="flex items-center space-x-2 border-b border-slate-800/80 pb-4 mb-5">
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">
+                  1
+                </span>
+                <h2 className="text-base font-semibold text-white">Paramètres Techniques</h2>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-300">Puissance voulue</label>
-                <select
-                  value={puissanceKw}
-                  onChange={(e) => {
-                    const kw = Number(e.target.value);
-                    setPuissanceKw(kw);
-                    setCoutInstallation(kw === 3 ? 7500 : kw === 6 ? 12500 : 17500);
-                  }}
-                  className="mt-1 block w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
-                >
-                  <option value={3}>3 kWc (~6-8 panneaux)</option>
-                  <option value={6}>6 kWc (~12-16 panneaux)</option>
-                  <option value={9}>9 kWc (~18-24 panneaux)</option>
-                </select>
-              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-2">
+                    Région géographique
+                  </label>
+                  <select
+                    value={region}
+                    onChange={(e) => setRegion(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
+                  >
+                    <option value="Île-de-France / Nord">Île-de-France / Nord (~950 kWh/kWc)</option>
+                    <option value="Grand-Est / Centre">Grand-Est / Centre (~1050 kWh/kWc)</option>
+                    <option value="Sud-Ouest / Rhône-Alpes">Sud-Ouest / Rhône-Alpes (~1250 kWh/kWc)</option>
+                    <option value="Provence / PACA / Occitanie">Provence / PACA / Occitanie (~1400 kWh/kWc)</option>
+                  </select>
+                </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-300">Consommation annuelle (kWh)</label>
-                <input
-                  type="number"
-                  value={consoAnnuelle}
-                  onChange={(e) => setConsoAnnuelle(Number(e.target.value))}
-                  className="mt-1 block w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
-                />
-              </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-2">
+                    Puissance souhaitée
+                  </label>
+                  <select
+                    value={puissanceKw}
+                    onChange={(e) => handlePuissanceChange(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
+                  >
+                    <option value={3}>3 kWc (~6 à 8 panneaux)</option>
+                    <option value={6}>6 kWc (~12 à 16 panneaux)</option>
+                    <option value={9}>9 kWc (~18 à 24 panneaux)</option>
+                  </select>
+                </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-300">Coût installation (€ TTC)</label>
-                <input
-                  type="number"
-                  value={coutInstallation}
-                  onChange={(e) => setCoutInstallation(Number(e.target.value))}
-                  className="mt-1 block w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
-                />
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-2">
+                    Consommation annuelle (kWh)
+                  </label>
+                  <input
+                    type="number"
+                    value={consoAnnuelle}
+                    onChange={(e) => setConsoAnnuelle(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-2">
+                    Coût estimé (€ TTC)
+                  </label>
+                  <input
+                    type="number"
+                    value={coutInstallation}
+                    onChange={(e) => setCoutInstallation(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
+                  />
+                </div>
               </div>
             </div>
 
-            <h2 className="text-lg font-semibold text-white border-b border-slate-700 pb-3 pt-2">
-              2. Vos Coordonnées (Obligatoire pour l&apos;Étude)
-            </h2>
+            {/* Bloco 2: Coordonnées */}
+            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-xl backdrop-blur-sm">
+              <div className="flex items-center space-x-2 border-b border-slate-800/80 pb-4 mb-5">
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">
+                  2
+                </span>
+                <h2 className="text-base font-semibold text-white">Vos Coordonnées pour l&apos;Étude</h2>
+              </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-300">Nom complet *</label>
-                <input
-                  type="text"
-                  placeholder="Jean Dupont"
-                  value={nomClient}
-                  onChange={(e) => setNomClient(e.target.value)}
-                  className="mt-1 block w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-300">E-mail *</label>
-                <input
-                  type="email"
-                  placeholder="jean@exemple.fr"
-                  value={emailClient}
-                  onChange={(e) => setEmailClient(e.target.value)}
-                  className="mt-1 block w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-300">Téléphone</label>
-                <input
-                  type="tel"
-                  placeholder="06 12 34 56 78"
-                  value={telClient}
-                  onChange={(e) => setTelClient(e.target.value)}
-                  className="mt-1 block w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-amber-500 outline-none"
-                />
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                    Nom & Prénom <span className="text-amber-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Jean Dupont"
+                    value={nomClient}
+                    onChange={(e) => setNomClient(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                      Adresse E-mail <span className="text-amber-400">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="jean.dupont@exemple.fr"
+                      value={emailClient}
+                      onChange={(e) => setEmailClient(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                      Téléphone
+                    </label>
+                    <input
+                      type="tel"
+                      placeholder="06 12 34 56 78"
+                      value={telClient}
+                      onChange={(e) => setTelClient(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
+                    />
+                  </div>
+                </div>
+
+                {errorMsg && (
+                  <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg p-2.5">
+                    ⚠️ {errorMsg}
+                  </p>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="lg:col-span-5 bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-2xl border border-amber-500/30 flex flex-col justify-between shadow-xl">
-            <div>
-              <h2 className="text-xl font-bold text-amber-400 mb-6 flex items-center justify-between">
-                <span>Bilan Estimé</span>
-                <span className="text-xs bg-amber-400/20 text-amber-300 px-2.5 py-0.5 rounded-full">20 ans</span>
-              </h2>
+          {/* Results Side */}
+          <div className="lg:col-span-5">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-2xl backdrop-blur-md sticky top-24">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
+                <div>
+                  <h2 className="text-lg font-bold text-white">Bilan Prévisionnel</h2>
+                  <p className="text-xs text-slate-400">Projection financière indicative</p>
+                </div>
+                <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  Sur 20 ans
+                </span>
+              </div>
 
-              <div className="space-y-4">
-                <div className="flex justify-between items-center text-sm border-b border-slate-700/60 pb-2.5">
-                  <span className="text-slate-400">Production Solaire :</span>
-                  <span className="font-semibold text-white">{productionEstimee.toFixed(0)} kWh / an</span>
+              {/* Métricas */}
+              <div className="space-y-4 mb-6">
+                <div className="flex justify-between items-center p-3 rounded-xl bg-slate-950/60 border border-slate-800/60">
+                  <span className="text-xs text-slate-400">Production Solaire estimée</span>
+                  <span className="text-sm font-semibold text-white">
+                    {Math.round(productionEstimee)} kWh / an
+                  </span>
                 </div>
 
-                <div className="flex justify-between items-center text-sm border-b border-slate-700/60 pb-2.5">
-                  <span className="text-slate-400">Économies Estimées :</span>
-                  <span className="font-bold text-emerald-400 text-base">~{economieAnnuelle.toFixed(0)} € / an</span>
+                <div className="flex justify-between items-center p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+                  <span className="text-xs text-emerald-300">Économies Annuelles</span>
+                  <span className="text-base font-bold text-emerald-400">
+                    ~{Math.round(economieAnnuelle)} € / an
+                  </span>
                 </div>
 
-                <div className="flex justify-between items-center text-sm border-b border-slate-700/60 pb-2.5">
-                  <span className="text-slate-400">Temps de Retour :</span>
-                  <span className="font-bold text-amber-400">{payback} ans</span>
+                <div className="flex justify-between items-center p-3 rounded-xl bg-slate-950/60 border border-slate-800/60">
+                  <span className="text-xs text-slate-400">Retour sur Investissement</span>
+                  <span className="text-sm font-semibold text-amber-400">
+                    {payback} ans
+                  </span>
                 </div>
 
-                <div className="flex justify-between items-center text-sm pt-1">
-                  <span className="text-slate-400">Bénéfice Net 20 ans :</span>
-                  <span className="font-extrabold text-emerald-400 text-lg">+{gain20ans.toFixed(0)} €</span>
+                <div className="flex justify-between items-center p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/20">
+                  <span className="text-xs text-indigo-300">Bénéfice Net Global (20 ans)</span>
+                  <span className="text-base font-bold text-indigo-400">
+                    +{Math.round(gain20ans)} €
+                  </span>
                 </div>
               </div>
-            </div>
 
-            <div className="mt-8 space-y-3">
+              {/* Botão de Ação */}
               <button
                 onClick={handleValidationAndPDF}
                 disabled={isSaving}
-                className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 px-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full bg-amber-500 hover:bg-amber-400 active:scale-[0.99] disabled:opacity-50 text-slate-950 font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-amber-500/20 transition flex items-center justify-center space-x-2 text-sm"
               >
-                <span>{isSaving ? "Enregistrement..." : "📄 Télécharger l'Étude (PDF)"}</span>
+                <span>📄</span>
+                <span>{isSaving ? "Génération en cours..." : "Télécharger l'Étude Complète (PDF)"}</span>
               </button>
+
               {saveSuccess && (
-                <p className="text-xs text-center text-emerald-400 font-medium">
-                  ✓ Demande enregistrée avec succès dans la base.
+                <p className="mt-3 text-xs text-center text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 rounded-lg py-2">
+                  ✓ Demande enregistrée avec succès. Votre téléchargement démarre...
                 </p>
               )}
+
+              <p className="mt-4 text-[11px] text-center text-slate-500">
+                🔒 Données strictement confidentielles destinées au dimensionnement.
+              </p>
             </div>
           </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
