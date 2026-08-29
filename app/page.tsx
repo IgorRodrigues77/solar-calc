@@ -218,11 +218,10 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Hero Section Comercial */}
+      {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
+        {/* Hero Section Comercial */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center mb-16 pb-12 border-b border-slate-800/80">
-          
-          {/* Lado Esquerdo: Proposta de Valor */}
           <div className="lg:col-span-7 space-y-5">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
               <span>☀️ SOLAR ENERGIE</span>
@@ -247,7 +246,6 @@ export default function Home() {
               </a>
             </div>
 
-            {/* Bullets de Confiança */}
             <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-300 font-medium">
               <div className="flex items-center gap-2">
                 <span className="text-emerald-400 font-bold">✓</span>
@@ -264,7 +262,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Lado Direito: Mockup / Preview do Card de Resultado */}
           <div className="lg:col-span-5">
             <div className="relative mx-auto max-w-sm rounded-2xl bg-gradient-to-b from-slate-800/60 to-slate-900/90 p-5 border border-slate-700/60 shadow-2xl backdrop-blur-xl">
               <div className="flex items-center justify-between border-b border-slate-700/60 pb-3 mb-4">
@@ -296,17 +293,13 @@ export default function Home() {
               </div>
             </div>
           </div>
-
         </div>
 
-        {/* Ancora para scroll suave */}
-        <div id="simulateur"></div>
-
-        {/* Grid Container */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Form Side */}
+        {/* Ancora e Grid do Formulário */}
+        <div id="simulateur" className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Lado Esquerdo: Formulário */}
           <div className="lg:col-span-7 space-y-6">
-            {/* Bloco 1: Paramètres Interactifs */}
+            {/* Bloco 1: Paramètres */}
             <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-xl backdrop-blur-sm space-y-6">
               <div className="flex items-center space-x-2 border-b border-slate-800/80 pb-4">
                 <span className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">
@@ -315,7 +308,7 @@ export default function Home() {
                 <h2 className="text-base font-semibold text-white">Paramètres Techniques</h2>
               </div>
 
-              {/* Escolha da Potência com Cards */}
+              {/* Cards de Potência */}
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-2.5">
                   Puissance de l&apos;installation souhaitée
@@ -324,20 +317,20 @@ export default function Home() {
                   {[
                     { kw: 3, panels: "6-8 panneaux", desc: "Maison standard" },
                     { kw: 6, panels: "12-16 panneaux", desc: "Moyenne / Grande" },
-                    { kw: 9, panels: "18-24 panneaux", desc: "Forte conso / Pompe" },
+                    { kw: 9, panels: "18-24 panneaux", desc: "Forte conso / PAC" },
                   ].map((item) => (
                     <button
                       key={item.kw}
                       type="button"
                       onClick={() => handlePuissanceChange(item.kw)}
-                      className={`p-3.5 rounded-xl border text-left transition-all ${
+                      className={`p-3 rounded-xl border text-left transition-all ${
                         puissanceKw === item.kw
                           ? "bg-amber-500/10 border-amber-500 text-white shadow-md shadow-amber-500/10"
                           : "bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200"
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className={`text-base font-black ${puissanceKw === item.kw ? "text-amber-400" : "text-white"}`}>
+                        <span className={`text-sm sm:text-base font-black ${puissanceKw === item.kw ? "text-amber-400" : "text-white"}`}>
                           {item.kw} kWc
                         </span>
                         {puissanceKw === item.kw && (
@@ -351,7 +344,7 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Slider de Consumo Anual */}
+              {/* Slider de Consumo */}
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <label className="text-xs font-medium text-slate-300">
@@ -371,13 +364,13 @@ export default function Home() {
                   className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
                 />
                 <div className="flex justify-between text-[10px] text-slate-500 mt-1">
-                  <span>2 000 kWh (Appartement)</span>
-                  <span>8 000 kWh (Maison standard)</span>
-                  <span>15 000 kWh (Grande maison / PAC)</span>
+                  <span>2 000 kWh</span>
+                  <span>8 000 kWh (Moyenne)</span>
+                  <span>15 000 kWh</span>
                 </div>
               </div>
 
-              {/* Região e Custo em Grid */}
+              {/* Região e Custo */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-800/60">
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-2">
@@ -386,7 +379,7 @@ export default function Home() {
                   <select
                     value={region}
                     onChange={(e) => setRegion(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
                   >
                     <option value="Île-de-France / Nord">Île-de-France / Nord (~950 kWh/kWc)</option>
                     <option value="Grand-Est / Centre">Grand-Est / Centre (~1050 kWh/kWc)</option>
@@ -397,13 +390,13 @@ export default function Home() {
 
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-2">
-                    Coût matériel & pose estimé (€ TTC)
+                    Coût indicatif (€ TTC)
                   </label>
                   <input
                     type="number"
                     value={coutInstallation}
                     onChange={(e) => setCoutInstallation(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition font-mono"
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition font-mono"
                   />
                 </div>
               </div>
@@ -469,7 +462,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Results Side */}
+          {/* Lado Direito: Resultados */}
           <div className="lg:col-span-5">
             <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-2xl backdrop-blur-md sticky top-24 space-y-6">
               <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -579,64 +572,6 @@ export default function Home() {
           </p>
         </div>
       </footer>
-    </div>
-  );
-}
-
-              {/* Métricas */}
-              <div className="space-y-4 mb-6">
-                <div className="flex justify-between items-center p-3 rounded-xl bg-slate-950/60 border border-slate-800/60">
-                  <span className="text-xs text-slate-400">Production Solaire estimée</span>
-                  <span className="text-sm font-semibold text-white">
-                    {Math.round(productionEstimee)} kWh / an
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
-                  <span className="text-xs text-emerald-300">Économies Annuelles</span>
-                  <span className="text-base font-bold text-emerald-400">
-                    ~{Math.round(economieAnnuelle)} € / an
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center p-3 rounded-xl bg-slate-950/60 border border-slate-800/60">
-                  <span className="text-xs text-slate-400">Retour sur Investissement</span>
-                  <span className="text-sm font-semibold text-amber-400">
-                    {payback} ans
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/20">
-                  <span className="text-xs text-indigo-300">Bénéfice Net Global (20 ans)</span>
-                  <span className="text-base font-bold text-indigo-400">
-                    +{Math.round(gain20ans)} €
-                  </span>
-                </div>
-              </div>
-
-              {/* Botão de Ação */}
-              <button
-                onClick={handleValidationAndPDF}
-                disabled={isSaving}
-                className="w-full bg-amber-500 hover:bg-amber-400 active:scale-[0.99] disabled:opacity-50 text-slate-950 font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-amber-500/20 transition flex items-center justify-center space-x-2 text-sm"
-              >
-                <span>📄</span>
-                <span>{isSaving ? "Génération en cours..." : "Télécharger l'Étude Complète (PDF)"}</span>
-              </button>
-
-              {saveSuccess && (
-                <p className="mt-3 text-xs text-center text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 rounded-lg py-2">
-                  ✓ Demande enregistrée avec succès. Votre téléchargement démarre...
-                </p>
-              )}
-
-              <p className="mt-4 text-[11px] text-center text-slate-500">
-                🔒 Données strictement confidentielles destinées au dimensionnement.
-              </p>
-            </div>
-          </div>
-        </div>
-      </main>
     </div>
   );
 }
