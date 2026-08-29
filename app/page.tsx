@@ -12,9 +12,36 @@ interface AddressSuggestion {
   coordinates: [number, number];
 }
 
+interface CompanyConfig {
+  companyName?: string;
+  logoBase64?: string;
+  telephone?: string;
+  email?: string;
+  website?: string;
+  address?: string;
+  siret?: string;
+  primaryColor?: string;
+}
+
 export default function Home() {
   const [currentStep, setCurrentStep] = useState(1);
   const [showOnePageResult, setShowOnePageResult] = useState(false);
+
+  // Configuração White-Label carregada do localStorage
+  const [companyConfig, setCompanyConfig] = useState<CompanyConfig>({
+    companyName: "SOLAR ENERGIE",
+  });
+
+  useEffect(() => {
+    const saved = localStorage.getItem("solar_company_config");
+    if (saved) {
+      try {
+        setCompanyConfig(JSON.parse(saved));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, []);
 
   // Endereço e Geocodificação
   const [addressInput, setAddressInput] = useState("");
@@ -38,7 +65,6 @@ export default function Home() {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Busca de Endereço na API Adresse du Gouvernement
   useEffect(() => {
     if (addressInput.length < 3 || (selectedAddress && addressInput === selectedAddress.label)) {
       setSuggestions([]);
@@ -69,7 +95,6 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [addressInput, selectedAddress]);
 
-  // Integração Oficial PVGIS
   const fetchPvgisData = async (lat: number, lon: number, kw: number) => {
     setIsLoadingPvgis(true);
     try {
@@ -125,7 +150,6 @@ export default function Home() {
     }
   };
 
-  // Cálculos Técnicos e Financeiros
   const productionEstimee = puissanceKw * productible;
   const prixKwhAchat = 0.25;
   const partAutoconsommation = 0.7;
@@ -164,6 +188,7 @@ export default function Home() {
           telephone: telClient,
           adresse: selectedAddress ? selectedAddress.label : addressInput,
           region,
+          societe: companyConfig.companyName || "SOLAR ENERGIE",
           productible_pvgis: productible,
           puissance_kw: puissanceKw,
           economie_annuelle: Math.round(economieAnnuelle),
@@ -181,17 +206,25 @@ export default function Home() {
     }
   };
 
+  // GERAÇÃO DO PDF WHITE-LABEL COMPLETO
   const handleDownloadPdf = () => {
     setIsGeneratingPdf(true);
 
     const doc = new jsPDF();
     const dateJour = new Date().toLocaleDateString("fr-FR");
     const adresseAffichee = selectedAddress ? selectedAddress.label : addressInput || "Adresse non spécifiée";
+    const brandName = (companyConfig.companyName || "SOLAR ENERGIE").toUpperCase();
 
     const renderFooter = (pageNumber: number) => {
       doc.setFontSize(7.5);
       doc.setTextColor(148, 163, 184);
-      doc.text("SOLAR ENERGIE FRANCE • Étude Technique Prévisionnelle (Données PVGIS JRC) • Confidentiel", 14, 285);
+      doc.text(
+        `Étude réalisée par ${companyConfig.companyName || "SOLAR ENERGIE"} ${
+          companyConfig.siret ? `• SIRET: ${companyConfig.siret}` : ""
+        } • Modèle PVGIS 5.2 • Confidentiel`,
+        14,
+        285
+      );
       doc.text(`Page ${pageNumber} / 5`, 185, 285);
     };
 
@@ -202,7 +235,7 @@ export default function Home() {
       doc.setTextColor(59, 130, 246);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
-      doc.text("SOLAR ENERGIE FRANCE", 14, 13);
+      doc.text(brandName, 14, 13);
 
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(12);
@@ -214,21 +247,38 @@ export default function Home() {
       doc.text(subtitle, 145, 23);
     };
 
-    // Página 1 (Capa)
+    // Página 1 (Capa White-Label)
     doc.setFillColor(15, 23, 42);
     doc.rect(0, 0, 210, 297, "F");
     doc.setFillColor(37, 99, 235);
     doc.rect(0, 0, 6, 297, "F");
 
-    doc.setTextColor(59, 130, 246);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.text("SOLAR ENERGIE FRANCE", 25, 45);
+    if (companyConfig.logoBase64) {
+      try {
+        doc.addImage(companyConfig.logoBase64, "PNG", 25, 35, 30, 15);
+      } catch (err) {
+        doc.setTextColor(59, 130, 246);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.text(brandName, 25, 45);
+      }
+    } else {
+      doc.setTextColor(59, 130, 246);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.text(brandName, 25, 45);
+    }
 
     doc.setTextColor(148, 163, 184);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    doc.text("Ingénierie & Solutions d'Autoconsommation Résidentielle", 25, 52);
+    doc.text(
+      `${companyConfig.website || "Solutions Photovoltaïques Résidentielles"}  ${
+        companyConfig.telephone ? `| Tél : ${companyConfig.telephone}` : ""
+      }`,
+      25,
+      54
+    );
 
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
@@ -239,16 +289,16 @@ export default function Home() {
     doc.setFontSize(11);
     doc.setTextColor(203, 213, 225);
     doc.setFont("helvetica", "normal");
-    doc.text("Calculs basés sur le modèle satellitaire PVGIS (Commission Européenne)", 25, 134);
+    doc.text("Dimensionnement technique, rentabilité prévisionnelle & bilan carbone", 25, 134);
 
     doc.setFillColor(30, 41, 59);
     doc.setDrawColor(51, 65, 85);
-    doc.roundedRect(25, 175, 160, 52, 4, 4, "FD");
+    doc.roundedRect(25, 175, 160, 56, 4, 4, "FD");
 
     doc.setTextColor(59, 130, 246);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
-    doc.text("BÉNÉFICIAIRE & LOCALISATION DU PROJET", 32, 186);
+    doc.text("BÉNÉFICIAIRE & SITE D'INSTALLATION", 32, 186);
 
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(10.5);
@@ -259,12 +309,15 @@ export default function Home() {
     doc.setTextColor(203, 213, 225);
     doc.text(`Adresse du site : ${adresseAffichee}`, 32, 203);
     doc.text(`Contact : ${emailClient || "Non renseigné"}  |  ${telClient || "Non renseigné"}`, 32, 211);
-    doc.text(`Productible PVGIS : ${productible} kWh / kWc / an`, 32, 219);
+    doc.text(`Gisement solaire (PVGIS) : ${productible} kWh / kWc / an`, 32, 219);
+    if (companyConfig.siret) {
+      doc.text(`Établi par : ${companyConfig.companyName} (SIRET: ${companyConfig.siret})`, 32, 227);
+    }
 
     doc.setFontSize(8.5);
     doc.setTextColor(148, 163, 184);
     doc.text(`Date d'émission : ${dateJour}`, 25, 260);
-    doc.text("Rapport certifié édité selon les normes PVGIS 5.2", 25, 266);
+    doc.text(`Document officiel édité pour le client par ${companyConfig.companyName || "SOLAR ENERGIE"}`, 25, 266);
 
     // Página 2 (Técnica)
     doc.addPage();
@@ -466,7 +519,7 @@ export default function Home() {
     doc.setFontSize(8.5);
     doc.setTextColor(71, 85, 105);
     doc.text("• Modules monocristallins avec garantie de rendement linéaire 25 ans.", 20, 111);
-    doc.text("• Installation réalisée par des artisans certifiés RGE QualiPV.", 20, 119);
+    doc.text(`• Installation réalisée par les équipes qualifiées de ${companyConfig.companyName || "SOLAR ENERGIE"}.`, 20, 119);
     doc.text("• Rachat garanti sur 20 ans par EDF OA selon barème CRE en vigueur.", 20, 127);
     doc.text("• Validation de conformité par le CONSUEL avant raccordement Enedis.", 20, 135);
     renderFooter(5);
@@ -486,7 +539,7 @@ export default function Home() {
               S
             </div>
             <span className="font-bold tracking-tight text-zinc-900 text-sm">
-              SOLAR ENERGIE <span className="text-zinc-400 font-normal">| Ingénierie PVGIS</span>
+              {companyConfig.companyName || "SOLAR ENERGIE"} <span className="text-zinc-400 font-normal">| Ingénierie PVGIS</span>
             </span>
           </div>
           <div className="flex items-center space-x-3">
@@ -495,6 +548,12 @@ export default function Home() {
               className="text-xs font-semibold text-zinc-700 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 rounded-lg px-3 py-1.5 transition"
             >
               📁 Mes Projets
+            </Link>
+            <Link
+              href="/settings"
+              className="text-xs font-semibold text-zinc-700 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 rounded-lg px-3 py-1.5 transition"
+            >
+              ⚙️ Ma Société
             </Link>
             <Link
               href="/pro"
@@ -508,14 +567,13 @@ export default function Home() {
 
       {/* Main Container */}
       <main className="max-w-6xl mx-auto px-6 py-12">
-        
         {/* TELA DE RESULTADO EM 1 PÁGINA */}
         {showOnePageResult ? (
           <div className="max-w-4xl mx-auto bg-white border border-zinc-200 rounded-3xl p-8 sm:p-12 shadow-sm mb-16 animate-in fade-in duration-300">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-100 pb-8 mb-8 gap-4">
               <div>
                 <span className="text-xs font-mono uppercase tracking-wider text-blue-600 font-semibold block mb-1">
-                  Bilan Personnalisé du Projet
+                  Étude réalisée par {companyConfig.companyName || "SOLAR ENERGIE"}
                 </span>
                 <h1 className="text-3xl sm:text-4xl font-black text-zinc-950 tracking-tight">
                   VOTRE PROJET SOLAIRE
@@ -617,7 +675,6 @@ export default function Home() {
           </div>
         ) : (
           <>
-            {/* Hero Section */}
             <div className="max-w-3xl mb-12">
               <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 mb-3">
                 <span>Données Solaires Officielles PVGIS / Commission Européenne</span>
@@ -630,14 +687,9 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Layout Grid do Simulador */}
             <div id="simulateur" className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start mb-24">
-              
-              {/* Formulário em Etapas */}
               <div className="lg:col-span-7">
                 <div className="bg-white border border-zinc-200/80 rounded-2xl p-7 sm:p-8 shadow-sm">
-                  
-                  {/* Stepper */}
                   <div className="mb-8">
                     <div className="flex justify-between items-center mb-2.5 text-xs font-semibold">
                       <span className={currentStep >= 1 ? "text-blue-600" : "text-zinc-400"}>
@@ -828,7 +880,7 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* ETAPA 3: Foco Exclusivo no Cliente */}
+                  {/* ETAPA 3 */}
                   {currentStep === 3 && (
                     <div className="space-y-6">
                       <div>
@@ -911,10 +963,9 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Dashboard Numérico Lateral */}
+              {/* Dashboard Numérico */}
               <div className="lg:col-span-5">
                 <div className="bg-white border border-zinc-200/80 rounded-2xl p-7 shadow-sm sticky top-24 space-y-6">
-                  
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400">
@@ -1043,10 +1094,10 @@ export default function Home() {
                 📑
               </div>
               <h3 className="text-base font-bold text-zinc-900 mb-2">
-                Dossier d&apos;Ingénierie 5 Pages
+                Dossier d&apos;Ingénierie White-Label
               </h3>
               <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
-                Exportez un rapport technique documenté prêt à être présenté à un installateur qualifié RGE QualiPV.
+                Exportez un rapport technique documenté de 5 pages entièrement personnalisé avec le nom et logo de votre entreprise.
               </p>
             </div>
           </div>
@@ -1090,9 +1141,9 @@ export default function Home() {
 
             <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm relative">
               <span className="text-xs font-mono font-bold text-blue-600 block mb-3">04</span>
-              <h3 className="text-base font-bold text-zinc-900 mb-2">Étude PDF</h3>
+              <h3 className="text-base font-bold text-zinc-900 mb-2">Étude White-Label</h3>
               <p className="text-xs text-zinc-500 leading-relaxed">
-                Éditez et téléchargez votre étude de 5 pages certifiée.
+                Éditez et téléchargez l&apos;étude de 5 pages avec vos propres couleurs et coordonnées.
               </p>
             </div>
           </div>
@@ -1124,7 +1175,7 @@ export default function Home() {
       <footer className="border-t border-zinc-200 bg-white py-12 mt-20 text-xs text-zinc-400">
         <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="font-medium text-zinc-700">
-            SOLAR ENERGIE FRANCE • Données Satellitaires PVGIS v5.2
+            {companyConfig.companyName || "SOLAR ENERGIE FRANCE"} • {companyConfig.siret ? `SIRET: ${companyConfig.siret}` : "Ingénierie Solaire"}
           </p>
           <p className="text-zinc-400">
             Étude indicative établie selon les standards d&apos;ingénierie et barèmes de rachat 2026.
