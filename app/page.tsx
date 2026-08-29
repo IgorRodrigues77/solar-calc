@@ -179,11 +179,16 @@ export default function Home() {
 
       const data = await res.json();
 
-      if (!res.ok) {
+      if (!res.ok && !data.nom && !data.adresse) {
         throw new Error(data.error || "Erreur lors de l'analyse.");
       }
 
-      if (data.nom) setNomClient(data.nom);
+      // Preenchimento do titular (se encontrado)
+      if (data.nom) {
+        setNomClient(data.nom);
+      }
+
+      // Preenchimento e geocodificação do endereço (se encontrado)
       if (data.adresse) {
         setAddressInput(data.adresse);
         try {
@@ -195,25 +200,32 @@ export default function Home() {
             handleSelectAddress(geoData.features[0]);
           }
         } catch (geoErr) {
-          console.warn("Geocodage:", geoErr);
+          console.warn("Geocodage automatique ignoré:", geoErr);
         }
       }
 
+      // Preenchimento do consumo somente se auditado e válido
       if (typeof data.conso === "number" && data.conso > 0) {
         setConsoAnnuelle(data.conso);
         const recKw = data.conso <= 4000 ? 3 : data.conso <= 8000 ? 6 : 9;
         handlePuissanceChange(recKw);
       }
 
+      // Atualização do card de status no frontend
       setExtractedBillData({
         nom: data.nom || "Non détecté",
         adresse: data.adresse || "Non détectée",
         conso: data.conso || undefined,
         puissanceRec: data.conso ? (data.conso <= 4000 ? 3 : data.conso <= 8000 ? 6 : 9) : undefined,
       });
+
+      // Se houver aviso de consumo ausente na fatura, orienta o usuário
+      if (!data.success && data.error) {
+        alert(data.error);
+      }
     } catch (err: any) {
       console.error("Erreur lecture facture:", err);
-      alert(`Échec : ${err.message || "Impossible de lire le document."}`);
+      alert(err.message || "Impossible d'analyser ce document.");
     } finally {
       setIsParsingBill(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
