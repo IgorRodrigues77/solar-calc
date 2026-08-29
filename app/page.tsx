@@ -4,11 +4,16 @@ import { useState } from "react";
 import jsPDF from "jspdf";
 
 export default function Home() {
+  // Controle do Wizard (Passos 1, 2 e 3)
+  const [currentStep, setCurrentStep] = useState(1);
+
+  // Dados Técnicos
   const [region, setRegion] = useState("Île-de-France / Nord");
   const [puissanceKw, setPuissanceKw] = useState(3);
   const [consoAnnuelle, setConsoAnnuelle] = useState(4800);
   const [coutInstallation, setCoutInstallation] = useState(7500);
 
+  // Dados do Lead
   const [nomClient, setNomClient] = useState("");
   const [emailClient, setEmailClient] = useState("");
   const [telClient, setTelClient] = useState("");
@@ -17,6 +22,7 @@ export default function Home() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  // Cálculos Técnicos e Financeiros
   const facteursRegion: Record<string, number> = {
     "Île-de-France / Nord": 950,
     "Grand-Est / Centre": 1050,
@@ -218,10 +224,10 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Main Container */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
-        {/* Hero Section Comercial */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center mb-16 pb-12 border-b border-slate-800/80">
+        {/* Hero Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center mb-12 pb-10 border-b border-slate-800/80">
           <div className="lg:col-span-7 space-y-5">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
               <span>☀️ SOLAR ENERGIE</span>
@@ -295,174 +301,264 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Ancora e Grid do Formulário */}
+        {/* Wizard Multi-Step Form */}
         <div id="simulateur" className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Lado Esquerdo: Formulário */}
+          {/* Lado Esquerdo: Formulário em Etapas */}
           <div className="lg:col-span-7 space-y-6">
-            {/* Bloco 1: Paramètres */}
-            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-xl backdrop-blur-sm space-y-6">
-              <div className="flex items-center space-x-2 border-b border-slate-800/80 pb-4">
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">
-                  1
-                </span>
-                <h2 className="text-base font-semibold text-white">Paramètres Techniques</h2>
-              </div>
-
-              {/* Cards de Potência */}
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-2.5">
-                  Puissance de l&apos;installation souhaitée
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { kw: 3, panels: "6-8 panneaux", desc: "Maison standard" },
-                    { kw: 6, panels: "12-16 panneaux", desc: "Moyenne / Grande" },
-                    { kw: 9, panels: "18-24 panneaux", desc: "Forte conso / PAC" },
-                  ].map((item) => (
-                    <button
-                      key={item.kw}
-                      type="button"
-                      onClick={() => handlePuissanceChange(item.kw)}
-                      className={`p-3 rounded-xl border text-left transition-all ${
-                        puissanceKw === item.kw
-                          ? "bg-amber-500/10 border-amber-500 text-white shadow-md shadow-amber-500/10"
-                          : "bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`text-sm sm:text-base font-black ${puissanceKw === item.kw ? "text-amber-400" : "text-white"}`}>
-                          {item.kw} kWc
-                        </span>
-                        {puissanceKw === item.kw && (
-                          <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                        )}
-                      </div>
-                      <p className="text-[11px] font-medium text-slate-300">{item.panels}</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">{item.desc}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Slider de Consumo */}
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <label className="text-xs font-medium text-slate-300">
-                    Consommation électrique annuelle
-                  </label>
-                  <span className="text-xs font-bold text-amber-400 font-mono bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                    {consoAnnuelle.toLocaleString("fr-FR")} kWh / an
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl backdrop-blur-sm">
+              {/* Stepper Progress Bar */}
+              <div className="mb-8">
+                <div className="flex justify-between items-center mb-3 text-xs font-semibold">
+                  <span className={currentStep >= 1 ? "text-amber-400" : "text-slate-600"}>
+                    1. Votre logement
+                  </span>
+                  <span className={currentStep >= 2 ? "text-amber-400" : "text-slate-600"}>
+                    2. Votre installation
+                  </span>
+                  <span className={currentStep >= 3 ? "text-amber-400" : "text-slate-600"}>
+                    3. Vos coordonnées
                   </span>
                 </div>
-                <input
-                  type="range"
-                  min={2000}
-                  max={15000}
-                  step={100}
-                  value={consoAnnuelle}
-                  onChange={(e) => setConsoAnnuelle(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                />
-                <div className="flex justify-between text-[10px] text-slate-500 mt-1">
-                  <span>2 000 kWh</span>
-                  <span>8 000 kWh (Moyenne)</span>
-                  <span>15 000 kWh</span>
+                <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+                  <div
+                    className="bg-amber-400 h-full rounded-full transition-all duration-300 ease-out"
+                    style={{
+                      width: currentStep === 1 ? "33.3%" : currentStep === 2 ? "66.6%" : "100%",
+                    }}
+                  ></div>
                 </div>
               </div>
 
-              {/* Região e Custo */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-800/60">
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-2">
-                    Région géographique
-                  </label>
-                  <select
-                    value={region}
-                    onChange={(e) => setRegion(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
-                  >
-                    <option value="Île-de-France / Nord">Île-de-France / Nord (~950 kWh/kWc)</option>
-                    <option value="Grand-Est / Centre">Grand-Est / Centre (~1050 kWh/kWc)</option>
-                    <option value="Sud-Ouest / Rhône-Alpes">Sud-Ouest / Rhône-Alpes (~1250 kWh/kWc)</option>
-                    <option value="Provence / PACA / Occitanie">Provence / PACA / Occitanie (~1400 kWh/kWc)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-2">
-                    Coût indicatif (€ TTC)
-                  </label>
-                  <input
-                    type="number"
-                    value={coutInstallation}
-                    onChange={(e) => setCoutInstallation(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition font-mono"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Bloco 2: Coordonnées */}
-            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-xl backdrop-blur-sm">
-              <div className="flex items-center space-x-2 border-b border-slate-800/80 pb-4 mb-5">
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">
-                  2
-                </span>
-                <h2 className="text-base font-semibold text-white">Vos Coordonnées pour l&apos;Étude</h2>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                    Nom & Prénom <span className="text-amber-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Jean Dupont"
-                    value={nomClient}
-                    onChange={(e) => setNomClient(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* ÉTAPE 1: Logement */}
+              {currentStep === 1 && (
+                <div className="space-y-6">
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                      Adresse E-mail <span className="text-amber-400">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      placeholder="jean.dupont@exemple.fr"
-                      value={emailClient}
-                      onChange={(e) => setEmailClient(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
-                    />
+                    <h2 className="text-lg font-bold text-white mb-1">
+                      Étape 1 — Votre logement
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      Renseignez votre localisation et votre consommation actuelle.
+                    </p>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                      Téléphone
+                    <label className="block text-xs font-medium text-slate-300 mb-2">
+                      Où se situe votre projet ?
                     </label>
+                    <select
+                      value={region}
+                      onChange={(e) => setRegion(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
+                    >
+                      <option value="Île-de-France / Nord">Île-de-France / Nord (~950 kWh/kWc)</option>
+                      <option value="Grand-Est / Centre">Grand-Est / Centre (~1050 kWh/kWc)</option>
+                      <option value="Sud-Ouest / Rhône-Alpes">Sud-Ouest / Rhône-Alpes (~1250 kWh/kWc)</option>
+                      <option value="Provence / PACA / Occitanie">Provence / PACA / Occitanie (~1400 kWh/kWc)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="text-xs font-medium text-slate-300">
+                        Quelle est votre consommation annuelle ?
+                      </label>
+                      <span className="text-xs font-bold text-amber-400 font-mono bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                        {consoAnnuelle.toLocaleString("fr-FR")} kWh / an
+                      </span>
+                    </div>
                     <input
-                      type="tel"
-                      placeholder="06 12 34 56 78"
-                      value={telClient}
-                      onChange={(e) => setTelClient(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
+                      type="range"
+                      min={2000}
+                      max={15000}
+                      step={100}
+                      value={consoAnnuelle}
+                      onChange={(e) => setConsoAnnuelle(Number(e.target.value))}
+                      className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
                     />
+                    <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                      <span>2 000 kWh</span>
+                      <span>8 000 kWh (Moyenne)</span>
+                      <span>15 000 kWh</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-800 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(2)}
+                      className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-6 py-2.5 rounded-xl transition flex items-center gap-2 text-sm shadow-md shadow-amber-500/20 cursor-pointer"
+                    >
+                      <span>Continuer</span>
+                      <span>→</span>
+                    </button>
                   </div>
                 </div>
+              )}
 
-                {errorMsg && (
-                  <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg p-2.5">
-                    ⚠️ {errorMsg}
-                  </p>
-                )}
-              </div>
+              {/* ÉTAPE 2: Installation */}
+              {currentStep === 2 && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-lg font-bold text-white mb-1">
+                      Étape 2 — Votre installation
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      Définissez la puissance et le coût prévisionnel de pose.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-2.5">
+                      Quelle puissance envisagez-vous ?
+                    </label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { kw: 3, panels: "6-8 panneaux", desc: "Maison standard" },
+                        { kw: 6, panels: "12-16 panneaux", desc: "Moyenne / Grande" },
+                        { kw: 9, panels: "18-24 panneaux", desc: "Forte conso / PAC" },
+                      ].map((item) => (
+                        <button
+                          key={item.kw}
+                          type="button"
+                          onClick={() => handlePuissanceChange(item.kw)}
+                          className={`p-3 rounded-xl border text-left transition-all ${
+                            puissanceKw === item.kw
+                              ? "bg-amber-500/10 border-amber-500 text-white shadow-md shadow-amber-500/10"
+                              : "bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className={`text-sm sm:text-base font-black ${puissanceKw === item.kw ? "text-amber-400" : "text-white"}`}>
+                              {item.kw} kWc
+                            </span>
+                            {puissanceKw === item.kw && (
+                              <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                            )}
+                          </div>
+                          <p className="text-[11px] font-medium text-slate-300">{item.panels}</p>
+                          <p className="text-[10px] text-slate-500 mt-0.5">{item.desc}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-2">
+                      Quel est votre budget indicatif (€ TTC) ?
+                    </label>
+                    <input
+                      type="number"
+                      value={coutInstallation}
+                      onChange={(e) => setCoutInstallation(Number(e.target.value))}
+                      className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition font-mono"
+                    />
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-800 flex justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(1)}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold px-5 py-2.5 rounded-xl transition text-sm cursor-pointer"
+                    >
+                      ← Retour
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(3)}
+                      className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-6 py-2.5 rounded-xl transition flex items-center gap-2 text-sm shadow-md shadow-amber-500/20 cursor-pointer"
+                    >
+                      <span>Continuer</span>
+                      <span>→</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ÉTAPE 3: Coordonnées & Résultats */}
+              {currentStep === 3 && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-lg font-bold text-white mb-1">
+                      Étape 3 — Vos coordonnées
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      Remplissez vos informations pour débloquer votre bilan complet et télécharger le dossier PDF.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                        Nom & Prénom <span className="text-amber-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Jean Dupont"
+                        value={nomClient}
+                        onChange={(e) => setNomClient(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                          Adresse E-mail <span className="text-amber-400">*</span>
+                        </label>
+                        <input
+                          type="email"
+                          placeholder="jean.dupont@exemple.fr"
+                          value={emailClient}
+                          onChange={(e) => setEmailClient(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                          Téléphone
+                        </label>
+                        <input
+                          type="tel"
+                          placeholder="06 12 34 56 78"
+                          value={telClient}
+                          onChange={(e) => setTelClient(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
+                        />
+                      </div>
+                    </div>
+
+                    {errorMsg && (
+                      <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg p-2.5">
+                        ⚠️ {errorMsg}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-800 flex justify-between items-center">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(2)}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold px-5 py-2.5 rounded-xl transition text-sm cursor-pointer"
+                    >
+                      ← Retour
+                    </button>
+
+                    <button
+                      onClick={handleValidationAndPDF}
+                      disabled={isSaving}
+                      className="bg-amber-500 hover:bg-amber-400 active:scale-[0.99] disabled:opacity-50 text-slate-950 font-bold py-2.5 px-5 rounded-xl shadow-lg shadow-amber-500/20 transition flex items-center space-x-2 text-sm cursor-pointer"
+                    >
+                      <span>📄</span>
+                      <span>{isSaving ? "Génération..." : "Voir mon estimation & PDF"}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Lado Direito: Resultados */}
+          {/* Lado Direito: Bilan Prévisionnel */}
           <div className="lg:col-span-5">
             <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-2xl backdrop-blur-md sticky top-24 space-y-6">
               <div className="flex items-center justify-between border-b border-slate-800 pb-4">
@@ -495,7 +591,7 @@ export default function Home() {
                 <p className="text-xl font-black text-emerald-400">~{Math.round(economieAnnuelle)} €</p>
               </div>
 
-              {/* Gráfico Simples de Rentabilidade Cumulativa */}
+              {/* Gráfico Simples de Rentabilidade */}
               <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
                 <p className="text-xs font-semibold text-slate-300">Cumul des gains estimés</p>
                 
@@ -532,33 +628,22 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Botão de Download */}
-              <div>
-                <button
-                  onClick={handleValidationAndPDF}
-                  disabled={isSaving}
-                  className="w-full bg-amber-500 hover:bg-amber-400 active:scale-[0.99] disabled:opacity-50 text-slate-950 font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-amber-500/20 transition flex items-center justify-center space-x-2 text-sm cursor-pointer"
-                >
-                  <span>📄</span>
-                  <span>{isSaving ? "Génération en cours..." : "Télécharger mon Étude (PDF)"}</span>
-                </button>
-
-                {saveSuccess && (
-                  <p className="mt-3 text-xs text-center text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 rounded-lg py-2">
-                    ✓ Demande enregistrée. Votre étude est en cours de téléchargement.
-                  </p>
-                )}
-
-                <p className="mt-3 text-[11px] text-center text-slate-500">
-                  🔒 Vos données restent confidentielles conformément au RGPD.
+              {/* Feedback e Segurança */}
+              {saveSuccess && (
+                <p className="text-xs text-center text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 rounded-lg py-2">
+                  ✓ Demande enregistrée. Votre étude est en cours de téléchargement.
                 </p>
-              </div>
+              )}
+
+              <p className="text-[11px] text-center text-slate-500">
+                🔒 Vos données restent confidentielles conformément au RGPD.
+              </p>
             </div>
           </div>
         </div>
       </main>
 
-      {/* Footer Profissional */}
+      {/* Footer */}
       <footer className="border-t border-slate-900 bg-slate-950 py-10 mt-16 text-xs text-slate-500">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center space-x-2">
