@@ -148,109 +148,6 @@ export default function Home() {
     fetchPvgisData(lat, lon, puissanceKw);
   };
 
-  // Parser Avançado de Fatura TotalEnergies / EDF / Engie
-  const handleBillUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsParsingBill(true);
-    setExtractedBillData(null);
-
-    try {
-      const buffer = await file.arrayBuffer();
-      const rawString = new TextDecoder("latin1").decode(buffer);
-
-      // Limpeza de caracteres para facilitar busca de strings
-      const cleanString = rawString.replace(/[^\x20-\x7E\xC0-\xFF]/g, " ");
-
-      let detectedName = "";
-      let detectedAddress = "";
-      let detectedConso = 0;
-
-      // 1. EXTRAÇÃO DO NOME DO CLIENTE
-      const nameMatch1 = cleanString.match(/Nom du client\s*:\s*([A-Za-zÀ-ÿ\s.\-]{3,40})/i);
-      const nameMatch2 = cleanString.match(/Titulaire du compte\s*:\s*([A-Za-zÀ-ÿ\s.\-]{3,40})/i);
-      const nameMatch3 = cleanString.match(/M\.\s+([A-ZÀ-ÿ\s\-]{3,35})/);
-
-      if (nameMatch1 && nameMatch1[1]?.trim().length > 3) {
-        detectedName = nameMatch1[1].trim().replace(/\s+/g, " ");
-      } else if (nameMatch2 && nameMatch2[1]?.trim().length > 3) {
-        detectedName = nameMatch2[1].trim().replace(/\s+/g, " ");
-      } else if (nameMatch3 && nameMatch3[1]?.trim().length > 3) {
-        detectedName = "M. " + nameMatch3[1].trim().replace(/\s+/g, " ");
-      } else {
-        detectedName = "Pierre Bokobza";
-      }
-
-      // 2. EXTRAÇÃO DO ENDEREÇO (Lieu de consommation ou Código Postal Francês)
-      const addrMatch1 = cleanString.match(/Lieu de consommation\s*:\s*([A-Za-z0-9\s,À-ÿ\-]{10,80})/i);
-      const addrMatch2 = cleanString.match(/(\d{1,4}\s+(?:RUE|AVENUE|BOULEVARD|BD|CHEMIN|ROUTE|VOIE|PLACE)[A-Za-z0-9\s,À-ÿ\-]+(?:75|91|92|93|94|95|77|78|13|69|33|31|59|06|44|34)\d{3}\s+[A-Za-zÀ-ÿ\-]+)/i);
-
-      if (addrMatch2 && addrMatch2[1]?.trim().length > 8) {
-        detectedAddress = addrMatch2[1].trim().replace(/\s+/g, " ");
-      } else if (addrMatch1 && addrMatch1[1]?.trim().length > 8) {
-        detectedAddress = addrMatch1[1].trim().replace(/\s+/g, " ");
-      } else {
-        detectedAddress = "35 Rue de Maubeuge, 75009 Paris";
-      }
-
-      // 3. EXTRAÇÃO DO CONSUMO ANUAL (kWh ou Conversão de Total TTC)
-      const kwhMatch = cleanString.match(/(\d{3,5})\s*kWh/i) || cleanString.match(/juil-\d{2}\s*(\d{3,5})/i);
-      const ttcMatch = cleanString.match(/Total\s+TTC\D*(\d{2,4}[,\.]\d{2})/i) || cleanString.match(/Electricit[^\d]*(\d{2,4}[,\.]\d{2})/i);
-
-      if (kwhMatch && parseInt(kwhMatch[1], 10) > 500) {
-        detectedConso = parseInt(kwhMatch[1], 10);
-      } else if (ttcMatch && ttcMatch[1]) {
-        const valEuros = parseFloat(ttcMatch[1].replace(",", "."));
-        detectedConso = Math.round(valEuros / 0.25); // Conversão precisa por valor tarifário
-      } else {
-        detectedConso = 3736;
-      }
-
-      // Aplicação dos valores extraídos aos estados da aplicação
-      setNomClient(detectedName);
-      setAddressInput(detectedAddress);
-      setConsoAnnuelle(detectedConso);
-
-      // Dispara geocodificação do endereço real extraído
-      try {
-        const res = await fetch(
-          `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(detectedAddress)}&limit=1`
-        );
-        const data = await res.json();
-        if (data.features && data.features.length > 0) {
-          const f = data.features[0];
-          handleSelectAddress({
-            label: f.properties.label,
-            postcode: f.properties.postcode,
-            city: f.properties.city,
-            context: f.properties.context,
-            coordinates: f.geometry.coordinates,
-          });
-        }
-      } catch (e) {
-        console.warn(e);
-      }
-
-      // Dimensionamento sugerido
-      const recKw = detectedConso <= 4000 ? 3 : detectedConso <= 8000 ? 6 : 9;
-      handlePuissanceChange(recKw);
-
-      // Atualização do card de feedback
-      setExtractedBillData({
-        nom: detectedName,
-        adresse: detectedAddress,
-        conso: detectedConso,
-        puissanceRec: recKw,
-      });
-
-    } catch (err) {
-      console.error("Erreur lecture facture:", err);
-    } finally {
-      setIsParsingBill(false);
-    }
-  };
-
   const handlePuissanceChange = (val: number) => {
     setPuissanceKw(val);
     if (val === 3) setCoutInstallation(7500);
@@ -260,6 +157,65 @@ export default function Home() {
     if (selectedAddress) {
       const [lon, lat] = selectedAddress.coordinates;
       fetchPvgisData(lat, lon, val);
+    }
+  };
+
+  // Upload e chamada para a rota de backend /api/parse-bill
+  const handleBillUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsParsingBill(true);
+    setExtractedBillData(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/parse-bill", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Erreur de traitement");
+
+      const data = await res.json();
+
+      const detectedName = data.nom || "Client Particulier";
+      const detectedAddress = data.adresse || "";
+      const detectedConso = data.conso || 4800;
+
+      setNomClient(detectedName);
+      if (detectedAddress) setAddressInput(detectedAddress);
+      setConsoAnnuelle(detectedConso);
+
+      if (detectedAddress) {
+        try {
+          const geoRes = await fetch(
+            `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(detectedAddress)}&limit=1`
+          );
+          const geoData = await geoRes.json();
+          if (geoData.features && geoData.features.length > 0) {
+            handleSelectAddress(geoData.features[0]);
+          }
+        } catch (err) {
+          console.warn(err);
+        }
+      }
+
+      const recKw = detectedConso <= 4000 ? 3 : detectedConso <= 8000 ? 6 : 9;
+      handlePuissanceChange(recKw);
+
+      setExtractedBillData({
+        nom: detectedName,
+        adresse: detectedAddress,
+        conso: detectedConso,
+        puissanceRec: recKw,
+      });
+    } catch (err) {
+      console.error("Erreur lecture facture:", err);
+    } finally {
+      setIsParsingBill(false);
     }
   };
 
