@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { GoogleGenAI, Type } from "@google/genai";
 
 export const maxDuration = 30;
 
@@ -6,75 +7,74 @@ export async function POST(req: Request) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: "Clé API non configurée" }, { status: 500 });
+      return NextResponse.json(
+        { error: "Clé API non configurée dans l'environnement." },
+        { status: 500 }
+      );
     }
 
     const formData = await req.formData();
     const file = formData.get("file") as File;
 
     if (!file) {
-      return NextResponse.json({ error: "Fichier manquant" }, { status: 400 });
+      return NextResponse.json({ error: "Aucun fichier fourni." }, { status: 400 });
     }
 
     const arrayBuffer = await file.arrayBuffer();
-    const base64Data = Buffer.from(arrayBuffer).toString("base64");
-    const mimeType = file.type || "application/pdf";
+    const buffer = Buffer.from(arrayBuffer);
+    const base64Data = buffer.toString("base64");
+    const mimeType = file.type && file.type.includes("pdf") ? "application/pdf" : "image/jpeg";
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const ai = new GoogleGenAI({ apiKey });
 
-    const promptText = `Analysez cette facture d'électricité française. Extrayez les 3 valeurs suivantes au format JSON pur uniquement :
-{
-  "nom": "Nom et prénom du titulaire",
-  "adresse": "Adresse du lieu de consommation (rue, code postal, ville)",
-  "conso": 3700
-}
-Pour 'conso', extrayez la consommation annuelle en kWh (ou divisez le montant TTC annuel par 0.25). Renvoyez uniquement l'objet JSON.`;
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                inline_data: {
-                  mime_type: mimeType,
-                  data: base64Data,
-                },
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              inlineData: {
+                data: base64Data,
+                mimeType: mimeType,
               },
-              { text: promptText },
-            ],
-          },
-        ],
-        generationConfig: {
-          response_mime_type: "application/json",
+            },
+            {
+              text: `Vous êtes un système d'extraction OCR de haute précision spécialisé dans les factures d'énergie en France (EDF, Engie, TotalEnergies, Enedis).
+
+Analysez rigoureusement le document fourni et extrayez :
+1. "nom": Le nom et prénom du titulaire du contrat ou client. Si introuvable, retournez null.
+2. "adresse": L'adresse physique exacte du lieu de consommation (numéro, voie, code postal et ville). Si introuvable, retournez null.
+3. "conso": La consommation annuelle en kWh explicitement indiquée (CAR - Consommation Annuelle de Référence, ou total annuel). Si la facture n'indique pas de consommation annuelle explicite, retournez null. NE PAS INVENTER de valeur.`,
+            },
+          ],
         },
-      }),
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            nom: { type: Type.STRING, nullable: true },
+            adresse: { type: Type.STRING, nullable: true },
+            conso: { type: Type.INTEGER, nullable: true },
+          },
+          required: ["nom", "adresse", "conso"],
+        },
+      },
     });
 
-    if (!response.ok) {
-      const errDetail = await response.text();
-      console.error("Détail Erreur Google API:", errDetail);
-      return NextResponse.json(
-        { error: `Google API Error (${response.status}): ${errDetail.slice(0, 180)}` },
-        { status: response.status }
-      );
-    }
-
-    const data = await response.json();
-    const rawJson = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-    const result = JSON.parse(rawJson);
+    const parsed = JSON.parse(response.text || "{}");
 
     return NextResponse.json({
-      nom: result.nom || "Client Particulier",
-      adresse: result.adresse || "",
-      conso: typeof result.conso === "number" ? result.conso : 4800,
+      nom: parsed.nom ?? null,
+      adresse: parsed.adresse ?? null,
+      conso: parsed.conso ?? null,
     });
   } catch (error: any) {
-    console.error("Erreur serveur:", error);
+    console.error("Erreur Gemini SDK:", error);
     return NextResponse.json(
-      { error: error?.message || "Erreur interne du serveur" },
+      { error: error?.message || "Erreur lors du traitement du document par l'IA." },
       { status: 500 }
     );
   }
