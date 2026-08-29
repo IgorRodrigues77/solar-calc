@@ -89,7 +89,7 @@ export default function Home() {
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(148, 163, 184); // Slate 400
-    doc.text("Installateur Qualifié RGE QualiPV • 01 89 00 00 00 • contact@solarenergie.fr", 14, 22);
+    doc.text("Installateur Qualifié RGE QualiPV  •  01 89 00 00 00  •  contact@solarenergie.fr", 14, 23);
 
     // Título do Relatório
     doc.setTextColor(255, 255, 255);
@@ -117,10 +117,10 @@ export default function Home() {
     doc.setTextColor(71, 85, 105);
     doc.text(`Nom / Titulaire : ${nomClient}`, 20, 64);
     doc.text(`E-mail : ${emailClient}`, 20, 71);
-    doc.text(`Téléphone : ${telClient || "Non renseigné"}`, 110, 64);
-    doc.text(`Secteur géographique : ${region}`, 110, 71);
+    doc.text(`Téléphone : ${telClient || "Non renseigné"}`, 105, 64);
+    doc.text(`Secteur géographique : ${region}`, 105, 71);
 
-    // 3. Caixa: Configuração Técnica Estimada
+    // 3. Caixa: Configuração Técnica Estimada (Coordenadas ajustadas)
     doc.setFillColor(248, 250, 252);
     doc.roundedRect(14, 83, 182, 38, 3, 3, "FD");
 
@@ -132,10 +132,10 @@ export default function Home() {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(71, 85, 105);
-    doc.text(`• Puissance crête recommandée : ${puissanceKw} kWc`, 20, 100);
-    doc.text(`• Consommation de référence : ${consoAnnuelle.toLocaleString("fr-FR")} kWh/an`, 20, 108);
-    doc.text(`• Estimation production annuelle : ${productionEstimee.toFixed(0)} kWh/an`, 110, 100);
-    doc.text(`• Coût indicatif de l'installation : ${coutInstallation.toLocaleString("fr-FR")} € TTC`, 110, 108);
+    doc.text(`• Puissance crête : ${puissanceKw} kWc`, 20, 100);
+    doc.text(`• Consommation référence : ${consoAnnuelle.toLocaleString("fr-FR")} kWh/an`, 20, 108);
+    doc.text(`• Production annuelle estimée : ${productionEstimee.toFixed(0)} kWh/an`, 105, 100);
+    doc.text(`• Investissement indicatif : ${coutInstallation.toLocaleString("fr-FR")} € TTC`, 105, 108);
 
     // 4. Três Cards Financeiros
     // Card 1: Economia Anual
@@ -146,8 +146,8 @@ export default function Home() {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     doc.text("ÉCONOMIE ANNUELLE", 18, 135);
-    doc.setFontSize(13);
-    doc.text(`~${economieAnnuelle.toFixed(0)} € / an`, 18, 147);
+    doc.setFontSize(12.5);
+    doc.text(`env. ${economieAnnuelle.toFixed(0)} € / an`, 18, 147);
 
     // Card 2: Retorno
     doc.setFillColor(254, 243, 199);
@@ -157,7 +157,7 @@ export default function Home() {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     doc.text("RETOUR SUR INVEST.", 81, 135);
-    doc.setFontSize(13);
+    doc.setFontSize(12.5);
     doc.text(`${payback} ans`, 81, 147);
 
     // Card 3: Ganho em 20 anos
@@ -168,7 +168,7 @@ export default function Home() {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     doc.text("GAIN ESTIMÉ (20 ANS)", 144, 135);
-    doc.setFontSize(13);
+    doc.setFontSize(12.5);
     doc.text(`+${gain20ans.toFixed(0)} €`, 144, 147);
 
     // 5. Bloco de Acompanhamento & Garantias
@@ -184,7 +184,7 @@ export default function Home() {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
     doc.setTextColor(71, 85, 105);
-    doc.text("• Étude de faisabilité et vérificação de structure toiture sous 48h.", 20, 182);
+    doc.text("• Étude de faisabilité et vérification de structure toiture sous 48h.", 20, 182);
     doc.text("• Accompagnement démarches administratives : Mairie, Consuel et raccordement Enedis.", 20, 189);
     doc.text("• Éligibilité prime à l'autoconsommation et contrat de rachat EDF OA sur 20 ans.", 20, 196);
     doc.text("• Matériel certifié avec garantie de rendement linéaire jusqu'à 25 ans.", 20, 203);
