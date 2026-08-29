@@ -120,11 +120,26 @@ export default function Home() {
     doc.text(`Téléphone : ${telClient || "Non renseigné"}`, 105, 64);
     doc.text(`Secteur géographique : ${region}`, 105, 71);
 
-    // 3. Caixa: Configuração Técnica Estimada (Coordenadas ajustadas)
+    // 3. Caixa: Configuração Técnica Estimada
     doc.setFillColor(248, 250, 252);
     doc.roundedRect(14, 83, 182, 38, 3, 3, "FD");
 
     doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10.5);
+    doc.text("CONFIGURATION TECHNIQUE PROPOSÉE", 20, 91);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    
+    // Linha de cima (Y = 101)
+    doc.text(`• Puissance crête : ${puissanceKw} kWc`, 20, 101);
+    doc.text(`• Production annuelle : ${productionEstimee.toFixed(0)} kWh/an`, 105, 101);
+
+    // Linha de baixo (Y = 111)
+    doc.text(`• Consommation : ${consoAnnuelle.toLocaleString("fr-FR")} kWh/an`, 20, 111);
+    doc.text(`• Investissement indicatif : ${coutInstallation.toLocaleString("fr-FR")} € TTC`, 105, 111);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10.5);
     doc.text("CONFIGURATION TECHNIQUE PROPOSÉE", 20, 91);
