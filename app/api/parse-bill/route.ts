@@ -25,8 +25,8 @@ export async function POST(req: Request) {
     const base64Data = Buffer.from(arrayBuffer).toString("base64");
     const mimeType = file.type || "application/pdf";
 
-    // Endpoint REST oficial v1beta do Gemini
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    // Endpoint corrigido com gemini-3.6-flash
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
 
     const prompt = `Vous êtes un moteur OCR expert en extraction de factures d'énergie françaises (EDF, TotalEnergies, Engie, Enedis).
 Analysez le document fourni et retournez STRICTEMENT un JSON valide avec cette structure exacte :
@@ -65,7 +65,7 @@ Ne générez AUCUN texte en dehors du JSON. Si une information est absente, mett
       const errorText = await response.text();
       console.error("Gemini API Error:", errorText);
       return NextResponse.json(
-        { error: `Erreur API (${response.status}): ${errorText.slice(0, 150)}` },
+        { error: `Erreur API (${response.status}): ${errorText.slice(0, 180)}` },
         { status: response.status }
       );
     }
@@ -73,7 +73,6 @@ Ne générez AUCUN texte en dehors du JSON. Si une information est absente, mett
     const data = await response.json();
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
     
-    // Sanitização para extrair somente o bloco JSON
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
     const result = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
 
