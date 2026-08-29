@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
-import { GoogleGenAI, Type } from "@google/genai";
+
+export const maxDuration = 30; // Permite tempo suficiente para processamento na Vercel
 
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.error("GEMINI_API_KEY non trouvée.");
       return NextResponse.json({ error: "Clé API non configurée" }, { status: 500 });
     }
-
-    const ai = new GoogleGenAI({ apiKey });
 
     const formData = await req.formData();
     const file = formData.get("file") as File;
@@ -19,58 +17,71 @@ export async function POST(req: Request) {
     }
 
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const base64Data = buffer.toString("base64");
+    const base64Data = Buffer.from(arrayBuffer).toString("base64");
     const mimeType = file.type || "application/pdf";
 
-    // Atualizado para o modelo ativo recomendado: gemini-3.6-flash
-    const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              inlineData: {
-                data: base64Data,
-                mimeType: mimeType,
+    // Chamada direta via REST API com timeout controlado
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s max
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+    const promptText = `Vous êtes un extracteur expert de factures d'énergie françaises (EDF, TotalEnergies, Engie, Enedis).
+Extrayez ces 3 informations du document sous forme de JSON strict :
+{
+  "nom": "Nom et prénom du titulaire (ex: PIERRE BOKOBZA)",
+  "adresse": "Adresse complète du lieu de consommation (rue, code postal et ville)",
+  "conso": 3736
+}
+Pour "conso", cherchez la consommation annuelle réelle en kWh (ou CAR). Si absent, divisez le montant TTC par 0.25. Donnez un entier.
+Répondez UNIQUEMENT avec l'objet JSON.`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                inline_data: {
+                  mime_type: mimeType,
+                  data: base64Data,
+                },
               },
-            },
-            {
-              text: `Vous êtes un extracteur expert de factures d'énergie en France (EDF, TotalEnergies, Engie, Enedis).
-Analysez le document et extrayez ces 3 champs structurés au format JSON :
-1. nom: nom et prénom complets du client ou titulaire du contrat (ex: PIERRE BOKOBZA).
-2. adresse: adresse complète du lieu de consommation (numéro, rue, code postal et ville).
-3. conso: consommation annuelle totale en kWh (CAR ou consommation annuelle estimée). Si absent, montant TTC / 0.25. Entier uniquement.`,
-            },
-          ],
-        },
-      ],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            nom: { type: Type.STRING },
-            adresse: { type: Type.STRING },
-            conso: { type: Type.INTEGER },
+              { text: promptText },
+            ],
           },
-          required: ["nom", "adresse", "conso"],
+        ],
+        generationConfig: {
+          response_mime_type: "application/json",
+          temperature: 0.1,
         },
-      },
+      }),
     });
 
-    const parsed = JSON.parse(response.text || "{}");
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("Erreur Gemini API:", errText);
+      return NextResponse.json({ error: "Échec de l'analyse IA" }, { status: response.status });
+    }
+
+    const data = await response.json();
+    const jsonString = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    const result = JSON.parse(jsonString);
 
     return NextResponse.json({
-      nom: parsed.nom || "Client Particulier",
-      adresse: parsed.adresse || "",
-      conso: parsed.conso || 4800,
+      nom: result.nom || "Client Particulier",
+      adresse: result.adresse || "",
+      conso: typeof result.conso === "number" ? result.conso : 4800,
     });
   } catch (error: any) {
-    console.error("Détail erreur Gemini Vision:", error?.message || error);
+    console.error("Erreur générale parsing:", error?.message || error);
     return NextResponse.json(
-      { error: error?.message || "Erreur de traitement IA" },
+      { error: error?.name === "AbortError" ? "Délai d'attente dépassé (timeout)" : "Erreur de traitement" },
       { status: 500 }
     );
   }
