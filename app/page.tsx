@@ -177,9 +177,11 @@ export default function Home() {
         body: formData,
       });
 
-      if (!res.ok) throw new Error("Erreur de traitement");
-
       const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Erreur lors de l'analyse");
+      }
 
       const detectedName = data.nom || "Client Particulier";
       const detectedAddress = data.adresse || "";
@@ -212,10 +214,12 @@ export default function Home() {
         conso: detectedConso,
         puissanceRec: recKw,
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erreur lecture facture:", err);
+      alert(`Échec de l'extraction : ${err.message || "Vérifiez la clé API ou le format du fichier."}`);
     } finally {
       setIsParsingBill(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 

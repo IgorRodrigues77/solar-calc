@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY || "",
-});
-
 export async function POST(req: Request) {
   try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error("GEMINI_API_KEY non trouvée dans les variables d'environnement.");
+      return NextResponse.json({ error: "Clé API non configurée" }, { status: 500 });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+
     const formData = await req.formData();
     const file = formData.get("file") as File;
 
@@ -32,11 +36,11 @@ export async function POST(req: Request) {
               },
             },
             {
-              text: `Vous êtes un extracteur expert de factures d'électricité françaises (EDF, TotalEnergies, Engie, Enedis).
-Analysez le document joint et extrayez exactement ces 3 champs structurés au format JSON :
-1. nom : Le nom complet du titulaire du contrat / client (ex: M. PIERRE BOKOBZA).
-2. adresse : L'adresse complète du lieu de consommation (rue, code postal et ville. Ex: 35 RUE DE MAUBEUGE, 75009 PARIS).
-3. conso : La consommation annuelle en kWh (recherchez le CAR, consommation annuelle de référence, ou le total annuel en kWh. Si absent, estimez via le montant TTC divisé par 0.25). Retournez uniquement l'entier.`,
+              text: `Vous êtes un extracteur expert de factures d'énergie en France.
+Extrayez ces 3 informations précises au format JSON :
+1. nom: nom et prénom du titulaire (ex: PIERRE BOKOBZA).
+2. adresse: adresse du lieu de consommation (rue, code postal et ville).
+3. conso: consommation annuelle totale en kWh (CAR ou estimée). Si absent, montant TTC / 0.25. Entier uniquement.`,
             },
           ],
         },
@@ -55,17 +59,17 @@ Analysez le document joint et extrayez exactement ces 3 champs structurés au fo
       },
     });
 
-    const result = JSON.parse(response.text || "{}");
+    const parsed = JSON.parse(response.text || "{}");
 
     return NextResponse.json({
-      nom: result.nom || "Client Particulier",
-      adresse: result.adresse || "",
-      conso: result.conso || 4800,
+      nom: parsed.nom || "Client Particulier",
+      adresse: parsed.adresse || "",
+      conso: parsed.conso || 4800,
     });
-  } catch (error) {
-    console.error("Erreur parsing facture via IA:", error);
+  } catch (error: any) {
+    console.error("Détail erreur Gemini Vision:", error?.message || error);
     return NextResponse.json(
-      { error: "Impossible de lire la facture" },
+      { error: error?.message || "Erreur de traitement IA" },
       { status: 500 }
     );
   }
