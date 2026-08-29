@@ -21,7 +21,7 @@ export default function Home() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Cálculos Técnicos e Financeiros
+  // Fatores de Cálculo
   const facteursRegion: Record<string, number> = {
     "Île-de-France / Nord": 950,
     "Grand-Est / Centre": 1050,
@@ -87,26 +87,22 @@ export default function Home() {
       setIsSaving(false);
     }
 
-    // ==========================================
-    // GERAÇÃO DO DOSSIER COMPLETO DE 5 PÁGINAS
-    // ==========================================
+    // Geração do PDF
     const doc = new jsPDF();
     const dateJour = new Date().toLocaleDateString("fr-FR");
 
-    // Helper: Rodapé Padrão
     const renderFooter = (pageNumber: number) => {
       doc.setFontSize(7.5);
       doc.setTextColor(148, 163, 184);
-      doc.text("SOLAR ENERGIE FRANCE • Dossier d'Étude Photovoltaïque • Confidentiel", 14, 285);
+      doc.text("SOLAR ENERGIE FRANCE • Étude Technique Prévisionnelle • Confidentiel", 14, 285);
       doc.text(`Page ${pageNumber} / 5`, 185, 285);
     };
 
-    // Helper: Cabeçalho Padrão
     const renderHeader = (title: string, subtitle: string) => {
-      doc.setFillColor(15, 23, 42); // Slate 900
+      doc.setFillColor(15, 23, 42);
       doc.rect(0, 0, 210, 32, "F");
 
-      doc.setTextColor(245, 158, 11);
+      doc.setTextColor(59, 130, 246);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
       doc.text("SOLAR ENERGIE FRANCE", 14, 13);
@@ -121,18 +117,15 @@ export default function Home() {
       doc.text(subtitle, 150, 23);
     };
 
-    // ==========================================
-    // PAGE 1 — COUVERTURE (Page de Garde)
-    // ==========================================
+    // Página 1
     doc.setFillColor(15, 23, 42);
     doc.rect(0, 0, 210, 297, "F");
+    doc.setFillColor(37, 99, 235);
+    doc.rect(0, 0, 6, 297, "F");
 
-    doc.setFillColor(245, 158, 11);
-    doc.rect(0, 0, 8, 297, "F");
-
-    doc.setTextColor(245, 158, 11);
+    doc.setTextColor(59, 130, 246);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
+    doc.setFontSize(14);
     doc.text("SOLAR ENERGIE FRANCE", 25, 45);
 
     doc.setTextColor(148, 163, 184);
@@ -151,12 +144,11 @@ export default function Home() {
     doc.setFont("helvetica", "normal");
     doc.text("Dimensionnement technique, rentabilité prévisionnelle & bilan carbone", 25, 134);
 
-    // Box Destinatário
     doc.setFillColor(30, 41, 59);
     doc.setDrawColor(51, 65, 85);
     doc.roundedRect(25, 175, 160, 45, 4, 4, "FD");
 
-    doc.setTextColor(245, 158, 11);
+    doc.setTextColor(59, 130, 246);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.text("BÉNÉFICIAIRE DE L'ÉTUDE", 32, 187);
@@ -176,12 +168,9 @@ export default function Home() {
     doc.text(`Date d'émission : ${dateJour}`, 25, 260);
     doc.text("Rapport d'audit préliminaire généré automatiquement", 25, 266);
 
-    // ==========================================
-    // PAGE 2 — SYNTHÈSE TECHNIQUE DU PROJET
-    // ==========================================
+    // Página 2
     doc.addPage();
     renderHeader("SYNTHÈSE DU PROJET", "Étape 1 sur 4");
-
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
@@ -207,7 +196,6 @@ export default function Home() {
     doc.setTextColor(16, 185, 129);
     doc.text(`${Math.round(productionEstimee)} kWh / an`, 100, 97);
 
-    // Box Impact Environnemental
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
@@ -229,21 +217,16 @@ export default function Home() {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(5, 150, 105);
     doc.text(`env. ${co2EviteKg} kg de CO2 par an (soit ${(co2EviteKg * 20 / 1000).toFixed(1)} tonnes de CO2 évitées sur 20 ans).`, 20, 160);
-
     renderFooter(2);
 
-    // ==========================================
-    // PAGE 3 — ANALYSE FINANCIÈRE
-    // ==========================================
+    // Página 3
     doc.addPage();
     renderHeader("ANALYSE FINANCIÈRE", "Étape 2 sur 4");
-
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
     doc.text("Synthèse des Flux Économiques", 14, 46);
 
-    // Cards Principais
     doc.setFillColor(248, 250, 252);
     doc.setDrawColor(226, 232, 240);
     doc.roundedRect(14, 54, 56, 35, 3, 3, "FD");
@@ -275,7 +258,6 @@ export default function Home() {
     doc.setFontSize(12.5);
     doc.text(`${payback} ans`, 144, 77);
 
-    // Detalhamento dos Ganhos
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
@@ -299,21 +281,16 @@ export default function Home() {
     doc.text("• Gain cumulé estimé sur 20 ans :", 20, 151);
     doc.setTextColor(67, 56, 202);
     doc.text(`+${Math.round(gain20ans)} €`, 145, 151);
-
     renderFooter(3);
 
-    // ==========================================
-    // PAGE 4 — PROJECTION SUR 20 ANS
-    // ==========================================
+    // Página 4
     doc.addPage();
     renderHeader("PROJECTION SUR 20 ANS", "Étape 3 sur 4");
-
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
     doc.text("Évolution Prévisionnelle de la Trésorerie", 14, 46);
 
-    // Cabeçalho da Tabela
     doc.setFillColor(15, 23, 42);
     doc.rect(14, 54, 182, 9, "F");
 
@@ -354,15 +331,11 @@ export default function Home() {
 
       posY += 9;
     });
-
     renderFooter(4);
 
-    // ==========================================
-    // PAGE 5 — HYPOTHÈSES & MÉTHODOLOGIE
-    // ==========================================
+    // Página 5
     doc.addPage();
     renderHeader("HYPOTHÈSES & MÉTHODOLOGIE", "Étape 4 sur 4");
-
     doc.setTextColor(15, 23, 42);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
@@ -396,132 +369,70 @@ export default function Home() {
     doc.text("• Onduleur haute efficacité avec suivi applicatif en temps réel.", 20, 121);
     doc.text("• Installation réalisée par des techniciens qualifiés RGE QualiPV.", 20, 129);
     doc.text("• Validation de conformité par le CONSUEL avant raccordement Enedis.", 20, 137);
-
     renderFooter(5);
 
     doc.save(`etude-solaire-complete-${nomClient.replace(/\s+/g, "_")}.pdf`);
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-amber-500 selection:text-slate-950">
-      {/* Top Navbar */}
-      <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <span className="text-xl">☀️</span>
-            <span className="font-bold tracking-tight text-white text-lg">
-              SOLAR <span className="text-amber-400">ENERGIE</span>
+    <div className="min-h-screen bg-[#fafafa] text-zinc-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
+      {/* Navbar Minimalista B2B */}
+      <header className="border-b border-zinc-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-5 h-5 rounded-md bg-blue-600 flex items-center justify-center text-white font-black text-xs">
+              S
+            </div>
+            <span className="font-bold tracking-tight text-zinc-900 text-sm">
+              SOLAR ENERGIE <span className="text-zinc-400 font-normal">| Ingénierie</span>
             </span>
           </div>
           <div className="flex items-center space-x-3">
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              Certifié RGE QualiPV
-            </span>
-            <span className="text-xs text-slate-400 border border-slate-800 rounded-lg px-2.5 py-1">
-              Barème 2026
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-zinc-100 text-zinc-700 border border-zinc-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+              Barème Officiel 2026
             </span>
           </div>
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
-        {/* Hero Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center mb-12 pb-10 border-b border-slate-800/80">
-          <div className="lg:col-span-7 space-y-5">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-              <span>☀️ SOLAR ENERGIE</span>
-            </div>
-            
-            <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
-              Votre projet solaire, <br />
-              <span className="text-amber-400">chiffré en 60 secondes.</span>
-            </h1>
-            
-            <p className="text-slate-400 text-sm sm:text-base max-w-xl leading-relaxed">
-              Estimez votre production photovoltaïque, vos économies annuelles et votre temps de retour sur investissement selon les barèmes en vigueur.
-            </p>
-
-            <div className="pt-2">
-              <a
-                href="#simulateur"
-                className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-6 py-3 rounded-xl shadow-lg shadow-amber-500/20 transition transform active:scale-95 text-sm"
-              >
-                <span>Calculer mon projet gratuitement</span>
-                <span>→</span>
-              </a>
-            </div>
-
-            <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-300 font-medium">
-              <div className="flex items-center gap-2">
-                <span className="text-emerald-400 font-bold">✓</span>
-                <span>Estimation personnalisée</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-emerald-400 font-bold">✓</span>
-                <span>Résultats instantanés</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-emerald-400 font-bold">✓</span>
-                <span>Étude complète (5 pages PDF)</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="lg:col-span-5">
-            <div className="relative mx-auto max-w-sm rounded-2xl bg-gradient-to-b from-slate-800/60 to-slate-900/90 p-5 border border-slate-700/60 shadow-2xl backdrop-blur-xl">
-              <div className="flex items-center justify-between border-b border-slate-700/60 pb-3 mb-4">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
-                </div>
-                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
-                  Dossier d&apos;Étude 5 Pages
-                </span>
-              </div>
-
-              <div className="space-y-3 font-mono text-xs">
-                <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <p className="text-[11px] text-slate-400">Production estimée</p>
-                  <p className="text-base font-bold text-white">4 500 kWh / an</p>
-                </div>
-
-                <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">
-                  <p className="text-[11px] text-emerald-300">Économies estimées</p>
-                  <p className="text-base font-bold text-emerald-400">~820 € / an</p>
-                </div>
-
-                <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                  <p className="text-[11px] text-slate-400">Temps de retour</p>
-                  <p className="text-base font-bold text-amber-400">9.8 ans</p>
-                </div>
-              </div>
-            </div>
-          </div>
+      {/* Hero Section Clean */}
+      <main className="max-w-6xl mx-auto px-6 py-12">
+        <div className="max-w-3xl mb-12">
+          <p className="text-xs font-semibold uppercase tracking-wider text-blue-600 mb-3">
+            Simulateur d&apos;Ingénierie Solaire
+          </p>
+          <h1 className="text-4xl sm:text-5xl font-extrabold text-zinc-950 tracking-tight leading-[1.15] mb-4">
+            Dimensionnement & rentabilité photovoltaïque.
+          </h1>
+          <p className="text-zinc-500 text-base leading-relaxed">
+            Chiffrez précisément votre production, vos flux financiers d&apos;autoconsommation et générez votre dossier d&apos;ingénierie certifié en PDF.
+          </p>
         </div>
 
-        {/* Wizard Multi-Step Form */}
-        <div id="simulateur" className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          <div className="lg:col-span-6 space-y-6">
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl backdrop-blur-sm">
-              {/* Stepper Progress Bar */}
+        {/* Layout Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+          
+          {/* Lado Esquerdo: Formulário em Etapas */}
+          <div className="lg:col-span-7">
+            <div className="bg-white border border-zinc-200/80 rounded-2xl p-7 sm:p-8 shadow-sm">
+              
+              {/* Stepper Minimalista */}
               <div className="mb-8">
-                <div className="flex justify-between items-center mb-3 text-xs font-semibold">
-                  <span className={currentStep >= 1 ? "text-amber-400" : "text-slate-600"}>
-                    1. Votre logement
+                <div className="flex justify-between items-center mb-2.5 text-xs font-semibold">
+                  <span className={currentStep >= 1 ? "text-blue-600" : "text-zinc-400"}>
+                    01. Logement
                   </span>
-                  <span className={currentStep >= 2 ? "text-amber-400" : "text-slate-600"}>
-                    2. Votre installation
+                  <span className={currentStep >= 2 ? "text-blue-600" : "text-zinc-400"}>
+                    02. Puissance
                   </span>
-                  <span className={currentStep >= 3 ? "text-amber-400" : "text-slate-600"}>
-                    3. Vos coordonnées
+                  <span className={currentStep >= 3 ? "text-blue-600" : "text-zinc-400"}>
+                    03. Finalisation
                   </span>
                 </div>
-                <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+                <div className="w-full bg-zinc-100 h-1.5 rounded-full overflow-hidden">
                   <div
-                    className="bg-amber-400 h-full rounded-full transition-all duration-300 ease-out"
+                    className="bg-blue-600 h-full rounded-full transition-all duration-300 ease-out"
                     style={{
                       width: currentStep === 1 ? "33.3%" : currentStep === 2 ? "66.6%" : "100%",
                     }}
@@ -529,40 +440,40 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* ÉTAPE 1: Logement */}
+              {/* ETAPA 1 */}
               {currentStep === 1 && (
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-lg font-bold text-white mb-1">
-                      Étape 1 — Votre logement
+                    <h2 className="text-lg font-bold text-zinc-900 tracking-tight mb-1">
+                      Localisation & Consommation
                     </h2>
-                    <p className="text-xs text-slate-400">
-                      Renseignez votre localisation et votre consommation actuelle.
+                    <p className="text-xs text-zinc-500">
+                      Sélectionnez la zone géographique pour ajuster le facteur d&apos;ensoleillement.
                     </p>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-2">
-                      Où se situe votre projet ?
+                    <label className="block text-xs font-medium text-zinc-700 mb-2">
+                      Région du projet
                     </label>
                     <select
                       value={region}
                       onChange={(e) => setRegion(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
+                      className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-4 py-3 text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
                     >
-                      <option value="Île-de-France / Nord">Île-de-France / Nord (~950 kWh/kWc)</option>
-                      <option value="Grand-Est / Centre">Grand-Est / Centre (~1050 kWh/kWc)</option>
-                      <option value="Sud-Ouest / Rhône-Alpes">Sud-Ouest / Rhône-Alpes (~1250 kWh/kWc)</option>
-                      <option value="Provence / PACA / Occitanie">Provence / PACA / Occitanie (~1400 kWh/kWc)</option>
+                      <option value="Île-de-France / Nord">Île-de-France / Nord (950 kWh/kWc)</option>
+                      <option value="Grand-Est / Centre">Grand-Est / Centre (1 050 kWh/kWc)</option>
+                      <option value="Sud-Ouest / Rhône-Alpes">Sud-Ouest / Rhône-Alpes (1 250 kWh/kWc)</option>
+                      <option value="Provence / PACA / Occitanie">Provence / PACA / Occitanie (1 400 kWh/kWc)</option>
                     </select>
                   </div>
 
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <label className="text-xs font-medium text-slate-300">
-                        Quelle est votre consommation annuelle ?
+                      <label className="text-xs font-medium text-zinc-700">
+                        Consommation électrique de référence
                       </label>
-                      <span className="text-xs font-bold text-amber-400 font-mono bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                      <span className="text-xs font-bold text-blue-600 font-mono bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-100">
                         {consoAnnuelle.toLocaleString("fr-FR")} kWh / an
                       </span>
                     </div>
@@ -573,149 +484,142 @@ export default function Home() {
                       step={100}
                       value={consoAnnuelle}
                       onChange={(e) => setConsoAnnuelle(Number(e.target.value))}
-                      className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                      className="w-full h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                     />
-                    <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                    <div className="flex justify-between text-[11px] text-zinc-400 mt-1">
                       <span>2 000 kWh</span>
-                      <span>8 000 kWh (Moyenne)</span>
+                      <span>8 000 kWh</span>
                       <span>15 000 kWh</span>
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-slate-800 flex justify-end">
+                  <div className="pt-4 border-t border-zinc-100 flex justify-end">
                     <button
                       type="button"
                       onClick={() => setCurrentStep(2)}
-                      className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-6 py-2.5 rounded-xl transition flex items-center gap-2 text-sm shadow-md shadow-amber-500/20 cursor-pointer"
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl transition text-sm shadow-sm cursor-pointer"
                     >
-                      <span>Continuer</span>
-                      <span>→</span>
+                      Étape suivante →
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* ÉTAPE 2: Installation */}
+              {/* ETAPA 2 */}
               {currentStep === 2 && (
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-lg font-bold text-white mb-1">
-                      Étape 2 — Votre installation
+                    <h2 className="text-lg font-bold text-zinc-900 tracking-tight mb-1">
+                      Dimensionnement de l&apos;Installation
                     </h2>
-                    <p className="text-xs text-slate-400">
-                      Définissez la puissance et le coût prévisionnel de pose.
+                    <p className="text-xs text-zinc-500">
+                      Choisissez la puissance crête cible adaptée à la toiture.
                     </p>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-2.5">
-                      Quelle puissance envisagez-vous ?
+                    <label className="block text-xs font-medium text-zinc-700 mb-2.5">
+                      Puissance installée
                     </label>
                     <div className="grid grid-cols-3 gap-3">
                       {[
-                        { kw: 3, panels: "6-8 panneaux", desc: "Maison standard" },
-                        { kw: 6, panels: "12-16 panneaux", desc: "Moyenne / Grande" },
-                        { kw: 9, panels: "18-24 panneaux", desc: "Forte conso / PAC" },
+                        { kw: 3, panels: "6-8 modules", budget: "7 500 €" },
+                        { kw: 6, panels: "12-16 modules", budget: "13 000 €" },
+                        { kw: 9, panels: "18-24 modules", budget: "18 000 €" },
                       ].map((item) => (
                         <button
                           key={item.kw}
                           type="button"
                           onClick={() => handlePuissanceChange(item.kw)}
-                          className={`p-3 rounded-xl border text-left transition-all ${
+                          className={`p-4 rounded-xl border text-left transition-all ${
                             puissanceKw === item.kw
-                              ? "bg-amber-500/10 border-amber-500 text-white shadow-md shadow-amber-500/10"
-                              : "bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200"
+                              ? "bg-blue-50/60 border-blue-600 text-zinc-900 shadow-sm"
+                              : "bg-zinc-50/50 border-zinc-200 text-zinc-600 hover:border-zinc-300"
                           }`}
                         >
-                          <div className="flex items-center justify-between mb-1">
-                            <span className={`text-sm sm:text-base font-black ${puissanceKw === item.kw ? "text-amber-400" : "text-white"}`}>
-                              {item.kw} kWc
-                            </span>
-                            {puissanceKw === item.kw && (
-                              <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                            )}
+                          <div className="text-xl font-bold text-zinc-950 mb-1">
+                            {item.kw} <span className="text-xs font-normal text-zinc-500">kWc</span>
                           </div>
-                          <p className="text-[11px] font-medium text-slate-300">{item.panels}</p>
-                          <p className="text-[10px] text-slate-500 mt-0.5">{item.desc}</p>
+                          <p className="text-[11px] font-medium text-zinc-700">{item.panels}</p>
+                          <p className="text-[10px] text-zinc-400 font-mono mt-0.5">{item.budget}</p>
                         </button>
                       ))}
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-2">
-                      Quel est votre budget indicatif (€ TTC) ?
+                    <label className="block text-xs font-medium text-zinc-700 mb-2">
+                      Investissement indicatif (€ TTC)
                     </label>
                     <input
                       type="number"
                       value={coutInstallation}
                       onChange={(e) => setCoutInstallation(Number(e.target.value))}
-                      className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition font-mono"
+                      className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-4 py-2.5 text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition font-mono"
                     />
                   </div>
 
-                  <div className="pt-4 border-t border-slate-800 flex justify-between">
+                  <div className="pt-4 border-t border-zinc-100 flex justify-between">
                     <button
                       type="button"
                       onClick={() => setCurrentStep(1)}
-                      className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold px-5 py-2.5 rounded-xl transition text-sm cursor-pointer"
+                      className="bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-medium px-5 py-2.5 rounded-xl transition text-sm cursor-pointer"
                     >
                       ← Retour
                     </button>
                     <button
                       type="button"
                       onClick={() => setCurrentStep(3)}
-                      className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-6 py-2.5 rounded-xl transition flex items-center gap-2 text-sm shadow-md shadow-amber-500/20 cursor-pointer"
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl transition text-sm shadow-sm cursor-pointer"
                     >
-                      <span>Continuer</span>
-                      <span>→</span>
+                      Étape suivante →
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* ÉTAPE 3: Coordonnées */}
+              {/* ETAPA 3 */}
               {currentStep === 3 && (
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-lg font-bold text-white mb-1">
-                      Étape 3 — Vos coordonnées
+                    <h2 className="text-lg font-bold text-zinc-900 tracking-tight mb-1">
+                      Coordonnées & Génération
                     </h2>
-                    <p className="text-xs text-slate-400">
-                      Remplissez vos informations pour débloquer votre bilan complet et télécharger le dossier de 5 pages.
+                    <p className="text-xs text-zinc-500">
+                      Renseignez vos coordonnées professionnelles pour éditer l&apos;audit complet.
                     </p>
                   </div>
 
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                        Nom & Prénom <span className="text-amber-400">*</span>
+                      <label className="block text-xs font-medium text-zinc-700 mb-1.5">
+                        Nom et prénom <span className="text-blue-600">*</span>
                       </label>
                       <input
                         type="text"
-                        placeholder="Ex: Jean Dupont"
+                        placeholder="Jean Dupont"
                         value={nomClient}
                         onChange={(e) => setNomClient(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
+                        className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
                       />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                          Adresse E-mail <span className="text-amber-400">*</span>
+                        <label className="block text-xs font-medium text-zinc-700 mb-1.5">
+                          Adresse e-mail <span className="text-blue-600">*</span>
                         </label>
                         <input
                           type="email"
-                          placeholder="jean.dupont@exemple.fr"
+                          placeholder="jean.dupont@entreprise.fr"
                           value={emailClient}
                           onChange={(e) => setEmailClient(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
+                          className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                        <label className="block text-xs font-medium text-zinc-700 mb-1.5">
                           Téléphone
                         </label>
                         <input
@@ -723,23 +627,23 @@ export default function Home() {
                           placeholder="06 12 34 56 78"
                           value={telClient}
                           onChange={(e) => setTelClient(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition"
+                          className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
                         />
                       </div>
                     </div>
 
                     {errorMsg && (
-                      <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg p-2.5">
-                        ⚠️ {errorMsg}
+                      <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-xl p-3">
+                        {errorMsg}
                       </p>
                     )}
                   </div>
 
-                  <div className="pt-4 border-t border-slate-800 flex justify-between items-center">
+                  <div className="pt-4 border-t border-zinc-100 flex justify-between items-center">
                     <button
                       type="button"
                       onClick={() => setCurrentStep(2)}
-                      className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold px-5 py-2.5 rounded-xl transition text-sm cursor-pointer"
+                      className="bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-medium px-5 py-2.5 rounded-xl transition text-sm cursor-pointer"
                     >
                       ← Retour
                     </button>
@@ -747,10 +651,9 @@ export default function Home() {
                     <button
                       onClick={handleValidationAndPDF}
                       disabled={isSaving}
-                      className="bg-amber-500 hover:bg-amber-400 active:scale-[0.99] disabled:opacity-50 text-slate-950 font-bold py-2.5 px-5 rounded-xl shadow-lg shadow-amber-500/20 transition flex items-center space-x-2 text-sm cursor-pointer"
+                      className="bg-zinc-950 hover:bg-zinc-800 active:scale-[0.99] disabled:opacity-50 text-white font-semibold py-2.5 px-6 rounded-xl transition text-sm cursor-pointer"
                     >
-                      <span>📄</span>
-                      <span>{isSaving ? "Génération..." : "Télécharger l'Étude Complète (PDF)"}</span>
+                      {isSaving ? "Génération..." : "Télécharger l'Étude (PDF)"}
                     </button>
                   </div>
                 </div>
@@ -758,126 +661,118 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Lado Direito: Resultados WOW */}
-          <div className="lg:col-span-6">
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-2xl backdrop-blur-md sticky top-24 space-y-6">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                <div>
-                  <h2 className="text-lg font-bold text-white">Votre projet solaire</h2>
-                  <p className="text-xs text-slate-400">Projection financière personnalisée et indicative</p>
-                </div>
-                <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  Étude Indicative
+          {/* Lado Direito: Dashboard Numérico High-Impact */}
+          <div className="lg:col-span-5">
+            <div className="bg-white border border-zinc-200/80 rounded-2xl p-7 shadow-sm sticky top-24 space-y-6">
+              
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400">
+                  Synthèse Prévisionnelle
                 </span>
+                <h2 className="text-xl font-extrabold text-zinc-950 tracking-tight mt-0.5">
+                  Indicateurs Clés
+                </h2>
               </div>
 
-              {/* Tabela de Métricas WOW */}
-              <div className="space-y-2.5 text-sm">
-                <div className="flex justify-between items-center p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-base">☀️</span>
-                    <span className="text-slate-300 font-medium">Production</span>
+              {/* Grid 2x2 com Números Gigantes */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-100">
+                  <span className="text-[11px] font-medium text-zinc-500 block mb-1">Production</span>
+                  <div className="text-2xl font-black text-zinc-950 font-mono tracking-tight">
+                    {Math.round(productionEstimee).toLocaleString("fr-FR")}
                   </div>
-                  <span className="font-bold text-white font-mono">{Math.round(productionEstimee).toLocaleString("fr-FR")} kWh/an</span>
+                  <span className="text-[10px] text-zinc-400">kWh / an</span>
                 </div>
 
-                <div className="flex justify-between items-center p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-base">💰</span>
-                    <span className="text-emerald-300 font-medium">Économies estimées</span>
+                <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-100">
+                  <span className="text-[11px] font-medium text-zinc-500 block mb-1">Économies</span>
+                  <div className="text-2xl font-black text-blue-600 font-mono tracking-tight">
+                    ~{Math.round(economieAnnuelle).toLocaleString("fr-FR")} €
                   </div>
-                  <span className="font-bold text-emerald-400 font-mono">~{Math.round(economieAnnuelle).toLocaleString("fr-FR")} €/an</span>
+                  <span className="text-[10px] text-zinc-400">par an</span>
                 </div>
 
-                <div className="flex justify-between items-center p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-base">📈</span>
-                    <span className="text-amber-300 font-medium">Temps de retour indicatif</span>
+                <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-100">
+                  <span className="text-[11px] font-medium text-zinc-500 block mb-1">Retour brut</span>
+                  <div className="text-2xl font-black text-zinc-950 font-mono tracking-tight">
+                    {payback}
                   </div>
-                  <span className="font-bold text-amber-400 font-mono">{payback} ans</span>
+                  <span className="text-[10px] text-zinc-400">années</span>
                 </div>
 
-                <div className="flex justify-between items-center p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-base">🌱</span>
-                    <span className="text-slate-300 font-medium">CO₂ évité</span>
+                <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-100">
+                  <span className="text-[11px] font-medium text-zinc-500 block mb-1">CO₂ évité</span>
+                  <div className="text-2xl font-black text-emerald-600 font-mono tracking-tight">
+                    {co2EviteKg}
                   </div>
-                  <span className="font-bold text-emerald-400 font-mono">~{co2EviteKg.toLocaleString("fr-FR")} kg/an</span>
+                  <span className="text-[10px] text-zinc-400">kg / an</span>
                 </div>
               </div>
 
-              {/* Gráfico de Rentabilidade */}
-              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
-                <div className="flex justify-between items-center">
-                  <p className="text-xs font-semibold text-slate-300">Votre investissement sur 20 ans</p>
-                  <span className="text-xs font-bold text-emerald-400 font-mono">Gain cumulé estimé : +{Math.round(gain20ans).toLocaleString("fr-FR")} €</span>
+              {/* Card Destaque: Ganho em 20 Anos */}
+              <div className="p-5 rounded-xl bg-zinc-950 text-white space-y-2">
+                <div className="flex justify-between items-center text-xs text-zinc-400">
+                  <span>Gain cumulé net (20 ans)</span>
+                  <span className="font-mono text-[10px] bg-zinc-800 px-2 py-0.5 rounded text-zinc-300">Amorti</span>
                 </div>
+                <div className="text-3xl font-black text-white font-mono tracking-tight">
+                  +{Math.round(gain20ans).toLocaleString("fr-FR")} €
+                </div>
+              </div>
 
-                <div className="h-32 w-full pt-2">
-                  <svg className="w-full h-full overflow-visible" viewBox="0 0 300 90">
-                    <line x1="25" y1="45" x2="295" y2="45" stroke="#334155" strokeWidth="1" strokeDasharray="3 3" />
-                    <text x="0" y="48" fill="#64748b" fontSize="8" fontFamily="monospace">0€</text>
-                    <text x="0" y="16" fill="#10b981" fontSize="8" fontFamily="monospace">+10k€</text>
-                    <text x="0" y="80" fill="#f43f5e" fontSize="8" fontFamily="monospace">-5k€</text>
-
+              {/* Gráfico SVG Minimalista */}
+              <div className="pt-2">
+                <div className="flex justify-between text-xs text-zinc-500 mb-2">
+                  <span>Trésorerie 20 ans</span>
+                  <span className="font-mono font-medium text-zinc-700">Seuil : {payback} ans</span>
+                </div>
+                <div className="h-20 w-full">
+                  <svg className="w-full h-full overflow-visible" viewBox="0 0 300 70">
+                    <line x1="20" y1="40" x2="295" y2="40" stroke="#e4e4e7" strokeWidth="1" strokeDasharray="3 3" />
+                    <text x="0" y="43" fill="#a1a1aa" fontSize="8" fontFamily="monospace">0€</text>
+                    
                     <path
-                      d="M 30 75 Q 120 45, 290 12"
+                      d="M 25 60 Q 110 40, 290 10"
                       fill="none"
-                      stroke="#f59e0b"
+                      stroke="#2563eb"
                       strokeWidth="2.5"
                     />
 
-                    <circle cx="30" cy="75" r="3.5" fill="#f43f5e" />
-                    <text x="30" y="88" fill="#94a3b8" fontSize="7" textAnchor="middle">0 an</text>
-
-                    <circle cx="125" cy="45" r="4" fill="#fbbf24" stroke="#0f172a" strokeWidth="1.5" />
-                    <text x="125" y="58" fill="#fbbf24" fontSize="7" fontWeight="bold" textAnchor="middle">{payback}a</text>
-
-                    <circle cx="290" cy="12" r="4" fill="#10b981" stroke="#0f172a" strokeWidth="1.5" />
-                    <text x="285" y="24" fill="#10b981" fontSize="7" fontWeight="bold" textAnchor="end">20 ans</text>
+                    <circle cx="25" cy="60" r="3" fill="#f43f5e" />
+                    <circle cx="120" cy="40" r="3.5" fill="#2563eb" stroke="#ffffff" strokeWidth="1.5" />
+                    <circle cx="290" cy="10" r="3.5" fill="#10b981" stroke="#ffffff" strokeWidth="1.5" />
                   </svg>
                 </div>
               </div>
 
-              {/* Botão de Ação Direta */}
               {currentStep === 3 && (
-                <div>
-                  <button
-                    onClick={handleValidationAndPDF}
-                    disabled={isSaving}
-                    className="w-full bg-amber-500 hover:bg-amber-400 active:scale-[0.99] disabled:opacity-50 text-slate-950 font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-amber-500/20 transition flex items-center justify-center space-x-2 text-sm cursor-pointer"
-                  >
-                    <span>📄</span>
-                    <span>{isSaving ? "Génération en cours..." : "Télécharger mon Dossier d'Étude (PDF)"}</span>
-                  </button>
-
-                  {saveSuccess && (
-                    <p className="mt-3 text-xs text-center text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 rounded-lg py-2">
-                      ✓ Demande enregistrée. Votre étude est en cours de téléchargement.
-                    </p>
-                  )}
-                </div>
+                <button
+                  onClick={handleValidationAndPDF}
+                  disabled={isSaving}
+                  className="w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.99] disabled:opacity-50 text-white font-semibold py-3.5 px-4 rounded-xl transition text-sm cursor-pointer shadow-sm"
+                >
+                  {isSaving ? "Édition du PDF..." : "Télécharger le Dossier Technique (PDF)"}
+                </button>
               )}
 
-              <p className="text-[11px] text-center text-slate-500">
-                🔒 Vos données restent strictement confidentielles conformément au RGPD.
-              </p>
+              {saveSuccess && (
+                <p className="text-xs text-center text-emerald-700 font-medium bg-emerald-50 border border-emerald-200 rounded-xl py-2.5">
+                  Dossier enregistré. Le téléchargement a débuté.
+                </p>
+              )}
             </div>
           </div>
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-10 mt-16 text-xs text-slate-500">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center space-x-2">
-            <span>☀️</span>
-            <span className="font-semibold text-slate-300">SOLAR ENERGIE FRANCE</span>
-            <span>—</span>
-            <span>Solutions Photovoltaïques Certifiées</span>
-          </div>
-          <p className="text-center sm:text-right">
-            Étude indicative basée sur les tarifs de rachat EDF OA et données météo 2026.
+      {/* Footer Minimalista */}
+      <footer className="border-t border-zinc-200 bg-white py-12 mt-20 text-xs text-zinc-400">
+        <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="font-medium text-zinc-700">
+            SOLAR ENERGIE FRANCE • Solutions Photovoltaïques Résidentielles
+          </p>
+          <p className="text-zinc-400">
+            Étude indicative établie selon les standards d&apos;ingénierie et barèmes de rachat 2026.
           </p>
         </div>
       </footer>
