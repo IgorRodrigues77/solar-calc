@@ -16,10 +16,6 @@ export default function Home() {
   const [currentStep, setCurrentStep] = useState(1);
   const [showOnePageResult, setShowOnePageResult] = useState(false);
 
-  // Customização White-Label
-  const [companyName, setCompanyName] = useState("SOLAR ENERGIE");
-  const [customLogoBase64, setCustomLogoBase64] = useState<string | null>(null);
-
   // Endereço e Geocodificação
   const [addressInput, setAddressInput] = useState("");
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
@@ -129,17 +125,6 @@ export default function Home() {
     }
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setCustomLogoBase64(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   // Cálculos Técnicos e Financeiros
   const productionEstimee = puissanceKw * productible;
   const prixKwhAchat = 0.25;
@@ -177,7 +162,6 @@ export default function Home() {
           nom: nomClient,
           email: emailClient,
           telephone: telClient,
-          societe_installateur: companyName,
           adresse: selectedAddress ? selectedAddress.label : addressInput,
           region,
           productible_pvgis: productible,
@@ -197,19 +181,17 @@ export default function Home() {
     }
   };
 
-  // Download do PDF 100% White-Label
   const handleDownloadPdf = () => {
     setIsGeneratingPdf(true);
 
     const doc = new jsPDF();
     const dateJour = new Date().toLocaleDateString("fr-FR");
     const adresseAffichee = selectedAddress ? selectedAddress.label : addressInput || "Adresse non spécifiée";
-    const brandName = companyName.trim() || "SOLAR ENERGIE";
 
     const renderFooter = (pageNumber: number) => {
       doc.setFontSize(7.5);
       doc.setTextColor(148, 163, 184);
-      doc.text(`Étude réalisée par ${brandName} • Modèle Satellitaire PVGIS 5.2 • Confidentiel`, 14, 285);
+      doc.text("SOLAR ENERGIE FRANCE • Étude Technique Prévisionnelle (Données PVGIS JRC) • Confidentiel", 14, 285);
       doc.text(`Page ${pageNumber} / 5`, 185, 285);
     };
 
@@ -220,7 +202,7 @@ export default function Home() {
       doc.setTextColor(59, 130, 246);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
-      doc.text(brandName.toUpperCase(), 14, 13);
+      doc.text("SOLAR ENERGIE FRANCE", 14, 13);
 
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(12);
@@ -232,32 +214,21 @@ export default function Home() {
       doc.text(subtitle, 145, 23);
     };
 
-    // Página 1 (Capa White-Label)
+    // Página 1 (Capa)
     doc.setFillColor(15, 23, 42);
     doc.rect(0, 0, 210, 297, "F");
     doc.setFillColor(37, 99, 235);
     doc.rect(0, 0, 6, 297, "F");
 
-    if (customLogoBase64) {
-      try {
-        doc.addImage(customLogoBase64, "PNG", 25, 35, 30, 15);
-      } catch (err) {
-        doc.setTextColor(59, 130, 246);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(14);
-        doc.text(brandName.toUpperCase(), 25, 45);
-      }
-    } else {
-      doc.setTextColor(59, 130, 246);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.text(brandName.toUpperCase(), 25, 45);
-    }
+    doc.setTextColor(59, 130, 246);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("SOLAR ENERGIE FRANCE", 25, 45);
 
     doc.setTextColor(148, 163, 184);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    doc.text("Ingénierie & Solutions d'Autoconsommation Résidentielle", 25, 54);
+    doc.text("Ingénierie & Solutions d'Autoconsommation Résidentielle", 25, 52);
 
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
@@ -293,7 +264,7 @@ export default function Home() {
     doc.setFontSize(8.5);
     doc.setTextColor(148, 163, 184);
     doc.text(`Date d'émission : ${dateJour}`, 25, 260);
-    doc.text(`Étude officielle éditée par ${brandName}`, 25, 266);
+    doc.text("Rapport certifié édité selon les normes PVGIS 5.2", 25, 266);
 
     // Página 2 (Técnica)
     doc.addPage();
@@ -495,7 +466,7 @@ export default function Home() {
     doc.setFontSize(8.5);
     doc.setTextColor(71, 85, 105);
     doc.text("• Modules monocristallins avec garantie de rendement linéaire 25 ans.", 20, 111);
-    doc.text(`• Installation réalisée par les équipes certifiées de ${brandName}.`, 20, 119);
+    doc.text("• Installation réalisée par des artisans certifiés RGE QualiPV.", 20, 119);
     doc.text("• Rachat garanti sur 20 ans par EDF OA selon barème CRE en vigueur.", 20, 127);
     doc.text("• Validation de conformité par le CONSUEL avant raccordement Enedis.", 20, 135);
     renderFooter(5);
@@ -542,7 +513,7 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-100 pb-8 mb-8 gap-4">
               <div>
                 <span className="text-xs font-mono uppercase tracking-wider text-blue-600 font-semibold block mb-1">
-                  Étude réalisée par {companyName.trim() || "SOLAR ENERGIE"}
+                  Bilan Personnalisé du Projet
                 </span>
                 <h1 className="text-3xl sm:text-4xl font-black text-zinc-950 tracking-tight">
                   VOTRE PROJET SOLAIRE
@@ -674,7 +645,7 @@ export default function Home() {
                         02. Puissance
                       </span>
                       <span className={currentStep >= 3 ? "text-blue-600" : "text-zinc-400"}>
-                        03. Société & Contact
+                        03. Coordonnées
                       </span>
                     </div>
                     <div className="w-full bg-zinc-100 h-1.5 rounded-full overflow-hidden">
@@ -855,57 +826,22 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* ETAPA 3: White-Label e Contato */}
+                  {/* ETAPA 3: Foco Exclusivo no Cliente */}
                   {currentStep === 3 && (
                     <div className="space-y-6">
                       <div>
                         <h2 className="text-lg font-bold text-zinc-900 tracking-tight mb-1">
-                          Personnalisation & Destinataire
+                          Vos coordonnées
                         </h2>
                         <p className="text-xs text-zinc-500">
-                          Personnalisez les coordonnées de votre entreprise et du client final pour l&apos;étude.
+                          Renseignez vos coordonnées pour afficher le bilan et éditer l&apos;étude.
                         </p>
                       </div>
 
-                      {/* Box White-Label */}
-                      <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200/80 space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-bold text-zinc-900">Édition White-Label (Marque de l&apos;installateur)</span>
-                          <span className="text-[10px] bg-blue-50 text-blue-700 font-mono px-2 py-0.5 rounded border border-blue-200">Option Pro</span>
-                        </div>
-                        
+                      <div className="space-y-4">
                         <div>
-                          <label className="block text-[11px] font-medium text-zinc-600 mb-1">
-                            Nom de votre entreprise / enseigne
-                          </label>
-                          <input
-                            type="text"
-                            value={companyName}
-                            onChange={(e) => setCompanyName(e.target.value)}
-                            placeholder="Ex: Volt Solaire France"
-                            className="w-full bg-white border border-zinc-300 rounded-lg px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-medium text-zinc-600 mb-1">
-                            Logo de l&apos;entreprise (PNG ou JPG)
-                          </label>
-                          <input
-                            type="file"
-                            accept="image/png, image/jpeg"
-                            onChange={handleLogoUpload}
-                            className="block w-full text-xs text-zinc-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-zinc-200 file:text-zinc-800 hover:file:bg-zinc-300 cursor-pointer"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Dados do Cliente */}
-                      <div className="space-y-3 pt-2">
-                        <span className="text-xs font-bold text-zinc-900 block">Informations du Client Final</span>
-                        <div>
-                          <label className="block text-xs font-medium text-zinc-700 mb-1">
-                            Nom et prénom du client <span className="text-blue-600">*</span>
+                          <label className="block text-xs font-medium text-zinc-700 mb-1.5">
+                            Nom et prénom <span className="text-blue-600">*</span>
                           </label>
                           <input
                             type="text"
@@ -916,9 +852,9 @@ export default function Home() {
                           />
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-xs font-medium text-zinc-700 mb-1">
+                            <label className="block text-xs font-medium text-zinc-700 mb-1.5">
                               Adresse e-mail <span className="text-blue-600">*</span>
                             </label>
                             <input
@@ -931,7 +867,7 @@ export default function Home() {
                           </div>
 
                           <div>
-                            <label className="block text-xs font-medium text-zinc-700 mb-1">
+                            <label className="block text-xs font-medium text-zinc-700 mb-1.5">
                               Téléphone
                             </label>
                             <input
@@ -1105,10 +1041,10 @@ export default function Home() {
                 📑
               </div>
               <h3 className="text-base font-bold text-zinc-900 mb-2">
-                Dossier d&apos;Ingénierie White-Label
+                Dossier d&apos;Ingénierie 5 Pages
               </h3>
               <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
-                Exportez un rapport technique documenté de 5 pages entièrement personnalisé avec le nom et logo de votre entreprise.
+                Exportez un rapport technique documenté prêt à être présenté à un installateur qualifié RGE QualiPV.
               </p>
             </div>
           </div>
@@ -1152,9 +1088,9 @@ export default function Home() {
 
             <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm relative">
               <span className="text-xs font-mono font-bold text-blue-600 block mb-3">04</span>
-              <h3 className="text-base font-bold text-zinc-900 mb-2">Étude White-Label</h3>
+              <h3 className="text-base font-bold text-zinc-900 mb-2">Étude PDF</h3>
               <p className="text-xs text-zinc-500 leading-relaxed">
-                Éditez et téléchargez l&apos;étude de 5 pages avec vos propres couleurs et coordonnées.
+                Éditez et téléchargez votre étude de 5 pages certifiée.
               </p>
             </div>
           </div>
@@ -1186,7 +1122,7 @@ export default function Home() {
       <footer className="border-t border-zinc-200 bg-white py-12 mt-20 text-xs text-zinc-400">
         <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="font-medium text-zinc-700">
-            SOLAR ENERGIE FRANCE • Moteur d&apos;Étude Photovoltaïque & Solutions Pro
+            SOLAR ENERGIE FRANCE • Données Satellitaires PVGIS v5.2
           </p>
           <p className="text-zinc-400">
             Étude indicative établie selon les standards d&apos;ingénierie et barèmes de rachat 2026.
