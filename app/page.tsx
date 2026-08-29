@@ -412,7 +412,7 @@ export default function Home() {
         </div>
 
         {/* Layout Grid do Simulador */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start mb-24">
+        <div id="simulateur" className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start mb-24">
           
           {/* Lado Esquerdo: Formulário em Etapas */}
           <div className="lg:col-span-7">
@@ -816,7 +816,7 @@ export default function Home() {
         </section>
 
         {/* SECTION 2: Comment ça marche ? */}
-        <section className="border-t border-zinc-200 pt-16">
+        <section className="border-t border-zinc-200 pt-16 mb-24">
           <div className="max-w-2xl mb-12">
             <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 block mb-2">
               Méthodologie
@@ -860,10 +860,31 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {/* SECTION 3: CTA FINAL */}
+        <section className="bg-zinc-950 rounded-3xl p-8 sm:p-14 text-center text-white relative overflow-hidden shadow-xl">
+          <div className="relative z-10 max-w-2xl mx-auto space-y-6">
+            <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
+              Vous envisagez l&apos;installation de panneaux solaires ?
+            </h2>
+            <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
+              Obtenez une première estimation de votre projet gratuitement en moins de 60 secondes.
+            </p>
+            <div className="pt-2">
+              <a
+                href="#simulateur"
+                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-8 py-3.5 rounded-xl shadow-lg shadow-blue-600/20 transition transform active:scale-95 text-sm cursor-pointer"
+              >
+                <span>Simuler mon projet</span>
+                <span>→</span>
+              </a>
+            </div>
+          </div>
+        </section>
       </main>
 
       {/* Footer Minimalista */}
-      <footer className="border-t border-zinc-200 bg-white py-12 mt-24 text-xs text-zinc-400">
+      <footer className="border-t border-zinc-200 bg-white py-12 mt-20 text-xs text-zinc-400">
         <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="font-medium text-zinc-700">
             SOLAR ENERGIE FRANCE • Solutions Photovoltaïques Résidentielles
