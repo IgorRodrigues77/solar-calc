@@ -14,20 +14,20 @@ interface AddressSuggestion {
 
 export default function Home() {
   const [currentStep, setCurrentStep] = useState(1);
+  const [showOnePageResult, setShowOnePageResult] = useState(false);
 
   // Endereço e Geocodificação
   const [addressInput, setAddressInput] = useState("");
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<AddressSuggestion | null>(null);
-  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
   const [isLoadingPvgis, setIsLoadingPvgis] = useState(false);
 
   // Dados Técnicos e Solares Reais (PVGIS)
   const [region, setRegion] = useState("Île-de-France / Nord");
   const [productible, setProductible] = useState(1050); // kWh/kWc/an
-  const [puissanceKw, setPuissanceKw] = useState(3);
+  const [puissanceKw, setPuissanceKw] = useState(6);
   const [consoAnnuelle, setConsoAnnuelle] = useState(4800);
-  const [coutInstallation, setCoutInstallation] = useState(7500);
+  const [coutInstallation, setCoutInstallation] = useState(13000);
 
   // Dados do Lead
   const [nomClient, setNomClient] = useState("");
@@ -46,7 +46,6 @@ export default function Home() {
     }
 
     const timer = setTimeout(async () => {
-      setIsSearchingAddress(true);
       try {
         const res = await fetch(
           `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(addressInput)}&limit=5`
@@ -64,31 +63,27 @@ export default function Home() {
         }
       } catch (err) {
         console.error("Erreur API Adresse:", err);
-      } finally {
-        setIsSearchingAddress(false);
       }
     }, 300);
 
     return () => clearTimeout(timer);
   }, [addressInput, selectedAddress]);
 
-  // Integração Oficial PVGIS (Comissão Europeia)
+  // Integração Oficial PVGIS
   const fetchPvgisData = async (lat: number, lon: number, kw: number) => {
     setIsLoadingPvgis(true);
     try {
-      // Chamada oficial PVGIS v5.2 com CORS liberado via JSON
       const pvgisUrl = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${lat}&lon=${lon}&peakpower=${kw}&loss=14&optimalinclination=1&outputformat=json`;
       const res = await fetch(pvgisUrl);
       const data = await res.json();
 
       if (data?.outputs?.totals?.fixed?.E_y) {
-        const annualYield = data.outputs.totals.fixed.E_y; // Produção anual em kWh para a potência
+        const annualYield = data.outputs.totals.fixed.E_y;
         const calculatedProductible = Math.round(annualYield / kw);
         setProductible(calculatedProductible);
       }
     } catch (err) {
       console.warn("PVGIS API fallback:", err);
-      // Fallback geográfico caso PVGIS esteja instável
       if (lat < 44.5) setProductible(1400);
       else if (lat < 46.5) setProductible(1250);
       else setProductible(1000);
@@ -105,7 +100,6 @@ export default function Home() {
     const [lon, lat] = addr.coordinates;
     const dept = parseInt(addr.postcode.substring(0, 2), 10);
 
-    // Identificação visual de setor
     if (lat < 44.5 || [13, 83, 84, 6, 4, 5, 30, 34, 66, 11, 20].includes(dept)) {
       setRegion("Provence / PACA / Occitanie");
     } else if (lat < 46.2 || [33, 40, 64, 24, 47, 69, 38, 73, 74].includes(dept)) {
@@ -116,7 +110,6 @@ export default function Home() {
       setRegion("Grand-Est / Centre");
     }
 
-    // Consulta PVGIS com as coordenadas reais
     fetchPvgisData(lat, lon, puissanceKw);
   };
 
@@ -179,13 +172,14 @@ export default function Home() {
         }),
       });
       setSaveSuccess(true);
+      setShowOnePageResult(true);
     } catch (e) {
       console.error(e);
     } finally {
       setIsSaving(false);
     }
 
-    // Geração do PDF de 5 Páginas com PVGIS
+    // Geração do PDF de 5 Páginas
     const doc = new jsPDF();
     const dateJour = new Date().toLocaleDateString("fr-FR");
     const adresseAffichee = selectedAddress ? selectedAddress.label : addressInput || "Adresse non spécifiée";
@@ -435,7 +429,7 @@ export default function Home() {
     });
     renderFooter(4);
 
-    // Página 5 (Normas e Base Científica PVGIS)
+    // Página 5 (Normas)
     doc.addPage();
     renderHeader("HYPOTHÈSES & MÉTHODOLOGIE", "Étape 4 sur 4");
     doc.setTextColor(15, 23, 42);
@@ -492,7 +486,7 @@ export default function Home() {
           <div className="flex items-center space-x-3">
             <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-zinc-100 text-zinc-700 border border-zinc-200">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              Modèle Satellitaire PVGIS 5.2
+              Données PVGIS 5.2
             </span>
             <Link
               href="/pro"
@@ -506,199 +500,306 @@ export default function Home() {
 
       {/* Main Container */}
       <main className="max-w-6xl mx-auto px-6 py-12">
-        {/* Hero Section */}
-        <div className="max-w-3xl mb-12">
-          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 mb-3">
-            <span>Données Solaires Officielles PVGIS / Commission Européenne</span>
-          </div>
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-zinc-950 tracking-tight leading-[1.15] mb-4">
-            Étude photovoltaïque de précision.
-          </h1>
-          <p className="text-zinc-500 text-base leading-relaxed">
-            Chiffrez votre rentabilité sur base satellitaire réelle et éditez votre dossier complet d&apos;ingénierie certifié.
-          </p>
-        </div>
+        
+        {/* TELA DE RESULTADO EM 1 PÁGINA (FICHA EXECUTIVA) */}
+        {showOnePageResult ? (
+          <div className="max-w-4xl mx-auto bg-white border border-zinc-200 rounded-3xl p-8 sm:p-12 shadow-sm mb-16 animate-in fade-in duration-300">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-zinc-100 pb-8 mb-8 gap-4">
+              <div>
+                <span className="text-xs font-mono uppercase tracking-wider text-blue-600 font-semibold block mb-1">
+                  Bilan Personnalisé du Projet
+                </span>
+                <h1 className="text-3xl sm:text-4xl font-black text-zinc-950 tracking-tight">
+                  VOTRE PROJET SOLAIRE
+                </h1>
+                <p className="text-zinc-500 text-sm mt-1">
+                  {selectedAddress ? selectedAddress.label : addressInput || "Installation Résidentielle"}
+                </p>
+              </div>
+              <div className="bg-zinc-950 text-white px-5 py-3 rounded-2xl text-center sm:text-right shadow-sm">
+                <span className="text-[10px] text-zinc-400 uppercase font-mono block">Puissance cible</span>
+                <span className="text-2xl font-black text-blue-400 font-mono">{puissanceKw} kWc</span>
+              </div>
+            </div>
 
-        {/* Layout Grid do Simulador */}
-        <div id="simulateur" className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start mb-24">
-          
-          {/* Formulário em Etapas */}
-          <div className="lg:col-span-7">
-            <div className="bg-white border border-zinc-200/80 rounded-2xl p-7 sm:p-8 shadow-sm">
-              
-              {/* Stepper */}
-              <div className="mb-8">
-                <div className="flex justify-between items-center mb-2.5 text-xs font-semibold">
-                  <span className={currentStep >= 1 ? "text-blue-600" : "text-zinc-400"}>
-                    01. Adresse & Gisement
-                  </span>
-                  <span className={currentStep >= 2 ? "text-blue-600" : "text-zinc-400"}>
-                    02. Puissance
-                  </span>
-                  <span className={currentStep >= 3 ? "text-blue-600" : "text-zinc-400"}>
-                    03. Finalisation
-                  </span>
+            {/* Grid dos 4 Grandes Resultados */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-8">
+              <div className="p-6 rounded-2xl bg-zinc-50 border border-zinc-200/80">
+                <div className="flex items-center gap-2 text-zinc-500 text-xs font-semibold mb-2">
+                  <span>☀️</span>
+                  <span>Production estimée</span>
                 </div>
-                <div className="w-full bg-zinc-100 h-1.5 rounded-full overflow-hidden">
-                  <div
-                    className="bg-blue-600 h-full rounded-full transition-all duration-300 ease-out"
-                    style={{
-                      width: currentStep === 1 ? "33.3%" : currentStep === 2 ? "66.6%" : "100%",
-                    }}
-                  ></div>
+                <div className="text-3xl sm:text-4xl font-black text-zinc-950 font-mono tracking-tight">
+                  {Math.round(productionEstimee).toLocaleString("fr-FR")} <span className="text-lg font-normal text-zinc-500">kWh/an</span>
                 </div>
+                <p className="text-[11px] text-zinc-400 mt-2">
+                  Calculé selon l&apos;ensoleillement réel PVGIS ({productible} kWh/kWc/an)
+                </p>
               </div>
 
-              {/* ETAPA 1: Endereço Inteligente & PVGIS */}
-              {currentStep === 1 && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-lg font-bold text-zinc-900 tracking-tight mb-1">
-                      Localisation du projet
-                    </h2>
-                    <p className="text-xs text-zinc-500">
-                      Renseignez l&apos;adresse du bien pour interroger le modèle satellitaire PVGIS.
-                    </p>
+              <div className="p-6 rounded-2xl bg-blue-50/50 border border-blue-100">
+                <div className="flex items-center gap-2 text-blue-700 text-xs font-semibold mb-2">
+                  <span>💰</span>
+                  <span>Économies estimées</span>
+                </div>
+                <div className="text-3xl sm:text-4xl font-black text-blue-600 font-mono tracking-tight">
+                  ~{Math.round(economieAnnuelle).toLocaleString("fr-FR")} <span className="text-lg font-normal text-blue-600/70">€/an</span>
+                </div>
+                <p className="text-[11px] text-blue-600/80 mt-2">
+                  Autoconsommation directe (~70%) + revente du surplus EDF OA
+                </p>
+              </div>
+
+              <div className="p-6 rounded-2xl bg-zinc-50 border border-zinc-200/80">
+                <div className="flex items-center gap-2 text-zinc-500 text-xs font-semibold mb-2">
+                  <span>📈</span>
+                  <span>Retour sur investissement</span>
+                </div>
+                <div className="text-3xl sm:text-4xl font-black text-zinc-950 font-mono tracking-tight">
+                  {payback} <span className="text-lg font-normal text-zinc-500">ans</span>
+                </div>
+                <p className="text-[11px] text-zinc-400 mt-2">
+                  Investissement amorti de {coutInstallation.toLocaleString("fr-FR")} € TTC
+                </p>
+              </div>
+
+              <div className="p-6 rounded-2xl bg-emerald-50/50 border border-emerald-100">
+                <div className="flex items-center gap-2 text-emerald-700 text-xs font-semibold mb-2">
+                  <span>🌱</span>
+                  <span>CO₂ évité</span>
+                </div>
+                <div className="text-3xl sm:text-4xl font-black text-emerald-600 font-mono tracking-tight">
+                  {co2EviteKg} <span className="text-lg font-normal text-emerald-600/70">kg/an</span>
+                </div>
+                <p className="text-[11px] text-emerald-600/80 mt-2">
+                  Soit {(co2EviteKg * 20 / 1000).toFixed(1)} tonnes de CO₂ évitées sur le cycle de 20 ans
+                </p>
+              </div>
+            </div>
+
+            {/* Bilan 20 ans & Botões de Ação */}
+            <div className="p-6 rounded-2xl bg-zinc-950 text-white mb-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div>
+                <p className="text-xs text-zinc-400 uppercase font-mono">Gain financier cumulé estimé</p>
+                <p className="text-2xl sm:text-3xl font-black text-white font-mono mt-0.5">
+                  +{Math.round(gain20ans).toLocaleString("fr-FR")} € <span className="text-xs font-normal text-emerald-400 font-sans">sur 20 ans</span>
+                </p>
+              </div>
+
+              <button
+                onClick={handleValidationAndPDF}
+                disabled={isSaving}
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3.5 px-6 rounded-xl transition text-sm shadow-md cursor-pointer"
+              >
+                {isSaving ? "Édition..." : "Télécharger l'étude PDF (5 pages) →"}
+              </button>
+            </div>
+
+            <div className="text-center">
+              <button
+                onClick={() => {
+                  setShowOnePageResult(false);
+                  setCurrentStep(1);
+                }}
+                className="text-xs text-zinc-500 hover:text-zinc-900 font-medium underline underline-offset-4 cursor-pointer"
+              >
+                ← Réaliser une nouvelle simulation
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Hero Section */}
+            <div className="max-w-3xl mb-12">
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 mb-3">
+                <span>Données Solaires Officielles PVGIS / Commission Européenne</span>
+              </div>
+              <h1 className="text-4xl sm:text-5xl font-extrabold text-zinc-950 tracking-tight leading-[1.15] mb-4">
+                Étude photovoltaïque de précision.
+              </h1>
+              <p className="text-zinc-500 text-base leading-relaxed">
+                Chiffrez votre rentabilité sur base satellitaire réelle et éditez votre dossier complet d&apos;ingénierie certifié.
+              </p>
+            </div>
+
+            {/* Layout Grid do Simulador */}
+            <div id="simulateur" className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start mb-24">
+              
+              {/* Formulário em Etapas */}
+              <div className="lg:col-span-7">
+                <div className="bg-white border border-zinc-200/80 rounded-2xl p-7 sm:p-8 shadow-sm">
+                  
+                  {/* Stepper */}
+                  <div className="mb-8">
+                    <div className="flex justify-between items-center mb-2.5 text-xs font-semibold">
+                      <span className={currentStep >= 1 ? "text-blue-600" : "text-zinc-400"}>
+                        01. Adresse & Gisement
+                      </span>
+                      <span className={currentStep >= 2 ? "text-blue-600" : "text-zinc-400"}>
+                        02. Puissance
+                      </span>
+                      <span className={currentStep >= 3 ? "text-blue-600" : "text-zinc-400"}>
+                        03. Finalisation
+                      </span>
+                    </div>
+                    <div className="w-full bg-zinc-100 h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className="bg-blue-600 h-full rounded-full transition-all duration-300 ease-out"
+                        style={{
+                          width: currentStep === 1 ? "33.3%" : currentStep === 2 ? "66.6%" : "100%",
+                        }}
+                      ></div>
+                    </div>
                   </div>
 
-                  <div className="relative">
-                    <label className="block text-xs font-medium text-zinc-700 mb-2">
-                      Adresse postale
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ex: 12 Rue de Paris, Massy"
-                      value={addressInput}
-                      onChange={(e) => setAddressInput(e.target.value)}
-                      className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-4 py-3 text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
-                    />
-
-                    {suggestions.length > 0 && (
-                      <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 overflow-hidden">
-                        {suggestions.map((s, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => handleSelectAddress(s)}
-                            className="w-full text-left px-4 py-3 text-xs sm:text-sm text-zinc-800 hover:bg-blue-50/80 hover:text-blue-900 border-b border-zinc-100 last:border-b-0 transition flex flex-col"
-                          >
-                            <span className="font-medium text-zinc-900">{s.label}</span>
-                            <span className="text-[11px] text-zinc-400 mt-0.5">{s.context}</span>
-                          </button>
-                        ))}
+                  {/* ETAPA 1 */}
+                  {currentStep === 1 && (
+                    <div className="space-y-6">
+                      <div>
+                        <h2 className="text-lg font-bold text-zinc-900 tracking-tight mb-1">
+                          Localisation du projet
+                        </h2>
+                        <p className="text-xs text-zinc-500">
+                          Renseignez l&apos;adresse du bien pour interroger le modèle satellitaire PVGIS.
+                        </p>
                       </div>
-                    )}
-                  </div>
 
-                  {/* Badge PVGIS com Dados Reais */}
-                  {selectedAddress && (
-                    <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-100 space-y-2 text-xs">
-                      <div className="flex justify-between items-center text-blue-950 font-semibold">
-                        <span>Coordonnées GPS :</span>
-                        <span className="font-mono text-zinc-600">
-                          {selectedAddress.coordinates[1].toFixed(4)}°N, {selectedAddress.coordinates[0].toFixed(4)}°E
-                        </span>
+                      <div className="relative">
+                        <label className="block text-xs font-medium text-zinc-700 mb-2">
+                          Adresse postale
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: 12 Rue de Paris, Massy"
+                          value={addressInput}
+                          onChange={(e) => setAddressInput(e.target.value)}
+                          className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-4 py-3 text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
+                        />
+
+                        {suggestions.length > 0 && (
+                          <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                            {suggestions.map((s, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => handleSelectAddress(s)}
+                                className="w-full text-left px-4 py-3 text-xs sm:text-sm text-zinc-800 hover:bg-blue-50/80 hover:text-blue-900 border-b border-zinc-100 last:border-b-0 transition flex flex-col"
+                              >
+                                <span className="font-medium text-zinc-900">{s.label}</span>
+                                <span className="text-[11px] text-zinc-400 mt-0.5">{s.context}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <div className="flex justify-between items-center text-blue-900">
-                        <span>Gisement solaire réel (PVGIS JRC) :</span>
-                        <span className="font-mono font-bold text-blue-700">
-                          {isLoadingPvgis ? "Calcul satellitaire..." : `${productible} kWh / kWc / an`}
-                        </span>
+
+                      {selectedAddress && (
+                        <div className="p-4 rounded-xl bg-blue-50/70 border border-blue-100 space-y-2 text-xs">
+                          <div className="flex justify-between items-center text-blue-950 font-semibold">
+                            <span>Coordonnées GPS :</span>
+                            <span className="font-mono text-zinc-600">
+                              {selectedAddress.coordinates[1].toFixed(4)}°N, {selectedAddress.coordinates[0].toFixed(4)}°E
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-blue-900">
+                            <span>Gisement solaire réel (PVGIS JRC) :</span>
+                            <span className="font-mono font-bold text-blue-700">
+                              {isLoadingPvgis ? "Calcul satellitaire..." : `${productible} kWh / kWc / an`}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="pt-2">
+                        <div className="flex justify-between items-center mb-2">
+                          <label className="text-xs font-medium text-zinc-700">
+                            Consommation électrique annuelle
+                          </label>
+                          <span className="text-xs font-bold text-blue-600 font-mono bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-100">
+                            {consoAnnuelle.toLocaleString("fr-FR")} kWh / an
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={2000}
+                          max={15000}
+                          step={100}
+                          value={consoAnnuelle}
+                          onChange={(e) => setConsoAnnuelle(Number(e.target.value))}
+                          className="w-full h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                        />
+                        <div className="flex justify-between text-[11px] text-zinc-400 mt-1">
+                          <span>2 000 kWh</span>
+                          <span>8 000 kWh</span>
+                          <span>15 000 kWh</span>
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-zinc-100 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setCurrentStep(2)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl transition text-sm shadow-sm cursor-pointer"
+                        >
+                          Étape suivante →
+                        </button>
                       </div>
                     </div>
                   )}
 
-                  {/* Consumo Anual */}
-                  <div className="pt-2">
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="text-xs font-medium text-zinc-700">
-                        Consommation électrique annuelle
-                      </label>
-                      <span className="text-xs font-bold text-blue-600 font-mono bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-100">
-                        {consoAnnuelle.toLocaleString("fr-FR")} kWh / an
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={2000}
-                      max={15000}
-                      step={100}
-                      value={consoAnnuelle}
-                      onChange={(e) => setConsoAnnuelle(Number(e.target.value))}
-                      className="w-full h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                    />
-                    <div className="flex justify-between text-[11px] text-zinc-400 mt-1">
-                      <span>2 000 kWh</span>
-                      <span>8 000 kWh</span>
-                      <span>15 000 kWh</span>
-                    </div>
-                  </div>
+                  {/* ETAPA 2 */}
+                  {currentStep === 2 && (
+                    <div className="space-y-6">
+                      <div>
+                        <h2 className="text-lg font-bold text-zinc-900 tracking-tight mb-1">
+                          Dimensionnement de l&apos;Installation
+                        </h2>
+                        <p className="text-xs text-zinc-500">
+                          Sélectionnez la puissance crête désirée.
+                        </p>
+                      </div>
 
-                  <div className="pt-4 border-t border-zinc-100 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setCurrentStep(2)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl transition text-sm shadow-sm cursor-pointer"
-                    >
-                      Étape suivante →
-                    </button>
-                  </div>
-                </div>
-              )}
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-700 mb-2.5">
+                          Puissance installée
+                        </label>
+                        <div className="grid grid-cols-3 gap-3">
+                          {[
+                            { kw: 3, panels: "6-8 modules", budget: "7 500 €" },
+                            { kw: 6, panels: "12-16 modules", budget: "13 000 €" },
+                            { kw: 9, panels: "18-24 modules", budget: "18 000 €" },
+                          ].map((item) => (
+                            <button
+                              key={item.kw}
+                              type="button"
+                              onClick={() => handlePuissanceChange(item.kw)}
+                              className={`p-4 rounded-xl border text-left transition-all ${
+                                puissanceKw === item.kw
+                                  ? "bg-blue-50/60 border-blue-600 text-zinc-900 shadow-sm"
+                                  : "bg-zinc-50/50 border-zinc-200 text-zinc-600 hover:border-zinc-300"
+                              }`}
+                            >
+                              <div className="text-xl font-bold text-zinc-950 mb-1">
+                                {item.kw} <span className="text-xs font-normal text-zinc-500">kWc</span>
+                              </div>
+                              <p className="text-[11px] font-medium text-zinc-700">{item.panels}</p>
+                              <p className="text-[10px] text-zinc-400 font-mono mt-0.5">{item.budget}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
 
-              {/* ETAPA 2: Potência */}
-              {currentStep === 2 && (
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-lg font-bold text-zinc-900 tracking-tight mb-1">
-                      Dimensionnement de l&apos;Installation
-                    </h2>
-                    <p className="text-xs text-zinc-500">
-                      Sélectionnez la puissance crête désirée.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-700 mb-2.5">
-                      Puissance installée
-                    </label>
-                    <div className="grid grid-cols-3 gap-3">
-                      {[
-                        { kw: 3, panels: "6-8 modules", budget: "7 500 €" },
-                        { kw: 6, panels: "12-16 modules", budget: "13 000 €" },
-                        { kw: 9, panels: "18-24 modules", budget: "18 000 €" },
-                      ].map((item) => (
-                        <button
-                          key={item.kw}
-                          type="button"
-                          onClick={() => handlePuissanceChange(item.kw)}
-                          className={`p-4 rounded-xl border text-left transition-all ${
-                            puissanceKw === item.kw
-                              ? "bg-blue-50/60 border-blue-600 text-zinc-900 shadow-sm"
-                              : "bg-zinc-50/50 border-zinc-200 text-zinc-600 hover:border-zinc-300"
-                          }`}
-                        >
-                          <div className="text-xl font-bold text-zinc-950 mb-1">
-                            {item.kw} <span className="text-xs font-normal text-zinc-500">kWc</span>
-                          </div>
-                          <p className="text-[11px] font-medium text-zinc-700">{item.panels}</p>
-                          <p className="text-[10px] text-zinc-400 font-mono mt-0.5">{item.budget}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-700 mb-2">
-                      Investissement indicatif (€ TTC)
-                    </label>
-                    <input
-                      type="number"
-                      value={coutInstallation}
-                      onChange={(e) => setCoutInstallation(Number(e.target.value))}
-                      className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-4 py-2.5 text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition font-mono"
-                    />
-                  </div>
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-700 mb-2">
+                          Investissement indicatif (€ TTC)
+                        </label>
+                        <input
+                          type="number"
+                          value={coutInstallation}
+                          onChange={(e) => setCoutInstallation(Number(e.target.value))}
+                          className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-4 py-2.5 text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition font-mono"
+                        />
+                      </div>
 
                   <div className="pt-4 border-t border-zinc-100 flex justify-between">
                     <button
@@ -719,7 +820,7 @@ export default function Home() {
                 </div>
               )}
 
-              {/* ETAPA 3: Coordenadas */}
+              {/* ETAPA 3 */}
               {currentStep === 3 && (
                 <div className="space-y-6">
                   <div>
@@ -727,7 +828,7 @@ export default function Home() {
                       Coordonnées & Génération
                     </h2>
                     <p className="text-xs text-zinc-500">
-                      Renseignez vos coordonnées pour éditer le dossier d&apos;ingénierie complet.
+                      Renseignez vos coordonnées pour afficher le bilan en 1 page et éditer le dossier PDF.
                     </p>
                   </div>
 
@@ -792,9 +893,9 @@ export default function Home() {
                     <button
                       onClick={handleValidationAndPDF}
                       disabled={isSaving}
-                      className="bg-zinc-950 hover:bg-zinc-800 active:scale-[0.99] disabled:opacity-50 text-white font-semibold py-2.5 px-6 rounded-xl transition text-sm cursor-pointer"
+                      className="bg-blue-600 hover:bg-blue-700 active:scale-[0.99] disabled:opacity-50 text-white font-semibold py-2.5 px-6 rounded-xl transition text-sm cursor-pointer shadow-sm"
                     >
-                      {isSaving ? "Génération..." : "Télécharger l'Étude PVGIS (PDF)"}
+                      {isSaving ? "Génération..." : "Afficher mon Résultat & PDF →"}
                     </button>
                   </div>
                 </div>
@@ -802,7 +903,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Dashboard Numérico */}
+          {/* Dashboard Numérico Lateral */}
           <div className="lg:col-span-5">
             <div className="bg-white border border-zinc-200/80 rounded-2xl p-7 shadow-sm sticky top-24 space-y-6">
               
@@ -820,7 +921,6 @@ export default function Home() {
                 </span>
               </div>
 
-              {/* Grid 2x2 */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-100">
                   <span className="text-[11px] font-medium text-zinc-500 block mb-1">Production</span>
@@ -855,7 +955,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Ganho Cumulativo */}
               <div className="p-5 rounded-xl bg-zinc-950 text-white space-y-2">
                 <div className="flex justify-between items-center text-xs text-zinc-400">
                   <span>Gain cumulé estimé (20 ans)</span>
@@ -866,7 +965,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Gráfico */}
               <div className="pt-2">
                 <div className="flex justify-between text-xs text-zinc-500 mb-2">
                   <span>Trésorerie 20 ans</span>
@@ -897,135 +995,131 @@ export default function Home() {
                   disabled={isSaving}
                   className="w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.99] disabled:opacity-50 text-white font-semibold py-3.5 px-4 rounded-xl transition text-sm cursor-pointer shadow-sm"
                 >
-                  {isSaving ? "Édition du PDF..." : "Télécharger l'Étude Technique PVGIS (PDF)"}
+                  {isSaving ? "Édition..." : "Télécharger l'Étude (PDF 5 Pages)"}
                 </button>
-              )}
-
-              {saveSuccess && (
-                <p className="text-xs text-center text-emerald-700 font-medium bg-emerald-50 border border-emerald-200 rounded-xl py-2.5">
-                  Dossier enregistré. Le téléchargement a débuté.
-                </p>
               )}
             </div>
           </div>
         </div>
+        </>
+      )}
 
-        {/* Vantagens */}
-        <section className="border-t border-zinc-200 pt-16 mb-20">
-          <div className="max-w-2xl mb-10">
-            <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 block mb-2">
-              Avantages Clés
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-bold text-zinc-950 tracking-tight">
-              Pourquoi utiliser notre simulateur ?
-            </h2>
-          </div>
+      {/* Vantagens */}
+      <section className="border-t border-zinc-200 pt-16 mb-20">
+        <div className="max-w-2xl mb-10">
+          <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 block mb-2">
+            Avantages Clés
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-bold text-zinc-950 tracking-tight">
+            Pourquoi utiliser notre simulateur ?
+          </h2>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-4 font-bold text-lg">
-                ⚡
-              </div>
-              <h3 className="text-base font-bold text-zinc-900 mb-2">
-                Modèle Satellitaire PVGIS
-              </h3>
-              <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
-                Calculs d&apos;ensoleillement réels basés sur les bases de données SARAH2 de la Commission Européenne.
-              </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-4 font-bold text-lg">
+              ⚡
             </div>
-
-            <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-4 font-bold text-lg">
-                📊
-              </div>
-              <h3 className="text-base font-bold text-zinc-900 mb-2">
-                Vision financière complète
-              </h3>
-              <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
-                Visualisez vos économies d&apos;autoconsommation, vos revenus EDF OA et votre retour sur investissement.
-              </p>
-            </div>
-
-            <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-4 font-bold text-lg">
-                📑
-              </div>
-              <h3 className="text-base font-bold text-zinc-900 mb-2">
-                Dossier d&apos;Ingénierie 5 Pages
-              </h3>
-              <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
-                Exportez un rapport technique documenté prêt à être présenté à un installateur qualifié RGE QualiPV.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Como Funciona */}
-        <section className="border-t border-zinc-200 pt-16 mb-24">
-          <div className="max-w-2xl mb-12">
-            <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 block mb-2">
-              Méthodologie
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-bold text-zinc-950 tracking-tight">
-              Comment ça marche ?
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm relative">
-              <span className="text-xs font-mono font-bold text-blue-600 block mb-3">01</span>
-              <h3 className="text-base font-bold text-zinc-900 mb-2">Votre adresse</h3>
-              <p className="text-xs text-zinc-500 leading-relaxed">
-                Indiquez l&apos;adresse du bien pour extraire les coordonnées GPS exactes.
-              </p>
-            </div>
-
-            <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm relative">
-              <span className="text-xs font-mono font-bold text-blue-600 block mb-3">02</span>
-              <h3 className="text-base font-bold text-zinc-900 mb-2">Calcul PVGIS</h3>
-              <p className="text-xs text-zinc-500 leading-relaxed">
-                L&apos;algorithme interroge la base européenne pour obtenir le gisement solaire exact.
-              </p>
-            </div>
-
-            <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm relative">
-              <span className="text-xs font-mono font-bold text-blue-600 block mb-3">03</span>
-              <h3 className="text-base font-bold text-zinc-900 mb-2">Résultats</h3>
-              <p className="text-xs text-zinc-500 leading-relaxed">
-                Découvrez vos indicateurs financiers personnalisés et le bilan carbone.
-              </p>
-            </div>
-
-            <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm relative">
-              <span className="text-xs font-mono font-bold text-blue-600 block mb-3">04</span>
-              <h3 className="text-base font-bold text-zinc-900 mb-2">Étude PDF</h3>
-              <p className="text-xs text-zinc-500 leading-relaxed">
-                Éditez et téléchargez votre étude de 5 pages certifiée.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* CTA Final */}
-        <section className="bg-zinc-950 rounded-3xl p-8 sm:p-14 text-center text-white relative overflow-hidden shadow-xl">
-          <div className="relative z-10 max-w-2xl mx-auto space-y-6">
-            <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
-              Vous envisagez l&apos;installation de panneaux solaires ?
-            </h2>
-            <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
-              Obtenez une première estimation basée sur les données PVGIS en moins de 60 secondes.
+            <h3 className="text-base font-bold text-zinc-900 mb-2">
+              Modèle Satellitaire PVGIS
+            </h3>
+            <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
+              Calculs d&apos;ensoleillement réels basés sur les bases de données SARAH2 de la Commission Européenne.
             </p>
-            <div className="pt-2">
-              <a
-                href="#simulateur"
-                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-8 py-3.5 rounded-xl shadow-lg shadow-blue-600/20 transition transform active:scale-95 text-sm cursor-pointer"
-              >
-                <span>Simuler mon projet</span>
-                <span>→</span>
-              </a>
-            </div>
           </div>
-        </section>
+
+          <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-4 font-bold text-lg">
+              📊
+            </div>
+            <h3 className="text-base font-bold text-zinc-900 mb-2">
+              Vision financière complète
+            </h3>
+            <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
+              Visualisez vos économies d&apos;autoconsommation, vos revenus EDF OA et votre retour sur investissement.
+            </p>
+          </div>
+
+          <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-4 font-bold text-lg">
+              📑
+            </div>
+            <h3 className="text-base font-bold text-zinc-900 mb-2">
+              Dossier d&apos;Ingénierie 5 Pages
+            </h3>
+            <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
+              Exportez un rapport technique documenté prêt à être présenté à un installateur qualifié RGE QualiPV.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Como Funciona */}
+      <section className="border-t border-zinc-200 pt-16 mb-24">
+        <div className="max-w-2xl mb-12">
+          <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 block mb-2">
+            Méthodologie
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-bold text-zinc-950 tracking-tight">
+            Comment ça marche ?
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm relative">
+            <span className="text-xs font-mono font-bold text-blue-600 block mb-3">01</span>
+            <h3 className="text-base font-bold text-zinc-900 mb-2">Votre adresse</h3>
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Indiquez l&apos;adresse du bien pour extraire les coordonnées GPS exactes.
+            </p>
+          </div>
+
+          <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm relative">
+            <span className="text-xs font-mono font-bold text-blue-600 block mb-3">02</span>
+            <h3 className="text-base font-bold text-zinc-900 mb-2">Calcul PVGIS</h3>
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              L&apos;algorithme interroge la base européenne pour obtenir le gisement solaire exact.
+            </p>
+          </div>
+
+          <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm relative">
+            <span className="text-xs font-mono font-bold text-blue-600 block mb-3">03</span>
+            <h3 className="text-base font-bold text-zinc-900 mb-2">Résultats</h3>
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Découvrez vos indicateurs financiers personnalisés et le bilan carbone.
+            </p>
+          </div>
+
+          <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm relative">
+            <span className="text-xs font-mono font-bold text-blue-600 block mb-3">04</span>
+            <h3 className="text-base font-bold text-zinc-900 mb-2">Étude PDF</h3>
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Éditez et téléchargez votre étude de 5 pages certifiée.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Final */}
+      <section className="bg-zinc-950 rounded-3xl p-8 sm:p-14 text-center text-white relative overflow-hidden shadow-xl">
+        <div className="relative z-10 max-w-2xl mx-auto space-y-6">
+          <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight">
+            Vous envisagez l&apos;installation de panneaux solaires ?
+          </h2>
+          <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
+            Obtenez une première estimation basée sur les données PVGIS en moins de 60 secondes.
+          </p>
+          <div className="pt-2">
+            <a
+              href="#simulateur"
+              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-8 py-3.5 rounded-xl shadow-lg shadow-blue-600/20 transition transform active:scale-95 text-sm cursor-pointer"
+            >
+              <span>Simuler mon projet</span>
+              <span>→</span>
+            </a>
+          </div>
+        </div>
+      </section>
       </main>
 
       {/* Footer */}
