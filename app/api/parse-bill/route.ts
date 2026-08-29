@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-export const maxDuration = 30; // Permite tempo suficiente para processamento na Vercel
+export const maxDuration = 30;
 
 export async function POST(req: Request) {
   try {
@@ -20,26 +20,19 @@ export async function POST(req: Request) {
     const base64Data = Buffer.from(arrayBuffer).toString("base64");
     const mimeType = file.type || "application/pdf";
 
-    // Chamada direta via REST API com timeout controlado
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s max
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-
-    const promptText = `Vous êtes un extracteur expert de factures d'énergie françaises (EDF, TotalEnergies, Engie, Enedis).
-Extrayez ces 3 informations du document sous forme de JSON strict :
+    const promptText = `Analysez cette facture d'électricité française. Extrayez les 3 valeurs suivantes au format JSON pur uniquement :
 {
-  "nom": "Nom et prénom du titulaire (ex: PIERRE BOKOBZA)",
-  "adresse": "Adresse complète du lieu de consommation (rue, code postal et ville)",
-  "conso": 3736
+  "nom": "Nom et prénom du titulaire",
+  "adresse": "Adresse du lieu de consommation (rue, code postal, ville)",
+  "conso": 3700
 }
-Pour "conso", cherchez la consommation annuelle réelle en kWh (ou CAR). Si absent, divisez le montant TTC par 0.25. Donnez un entier.
-Répondez UNIQUEMENT avec l'objet JSON.`;
+Pour 'conso', extrayez la consommation annuelle en kWh (ou divisez le montant TTC annuel par 0.25). Renvoyez uniquement l'objet JSON.`;
 
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      signal: controller.signal,
       body: JSON.stringify({
         contents: [
           {
@@ -56,22 +49,22 @@ Répondez UNIQUEMENT avec l'objet JSON.`;
         ],
         generationConfig: {
           response_mime_type: "application/json",
-          temperature: 0.1,
         },
       }),
     });
 
-    clearTimeout(timeoutId);
-
     if (!response.ok) {
-      const errText = await response.text();
-      console.error("Erreur Gemini API:", errText);
-      return NextResponse.json({ error: "Échec de l'analyse IA" }, { status: response.status });
+      const errDetail = await response.text();
+      console.error("Détail Erreur Google API:", errDetail);
+      return NextResponse.json(
+        { error: `Google API Error (${response.status}): ${errDetail.slice(0, 180)}` },
+        { status: response.status }
+      );
     }
 
     const data = await response.json();
-    const jsonString = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-    const result = JSON.parse(jsonString);
+    const rawJson = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    const result = JSON.parse(rawJson);
 
     return NextResponse.json({
       nom: result.nom || "Client Particulier",
@@ -79,9 +72,9 @@ Répondez UNIQUEMENT avec l'objet JSON.`;
       conso: typeof result.conso === "number" ? result.conso : 4800,
     });
   } catch (error: any) {
-    console.error("Erreur générale parsing:", error?.message || error);
+    console.error("Erreur serveur:", error);
     return NextResponse.json(
-      { error: error?.name === "AbortError" ? "Délai d'attente dépassé (timeout)" : "Erreur de traitement" },
+      { error: error?.message || "Erreur interne du serveur" },
       { status: 500 }
     );
   }
