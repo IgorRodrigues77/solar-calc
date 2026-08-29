@@ -471,16 +471,117 @@ export default function Home() {
 
           {/* Results Side */}
           <div className="lg:col-span-5">
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-2xl backdrop-blur-md sticky top-24">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-2xl backdrop-blur-md sticky top-24 space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                 <div>
                   <h2 className="text-lg font-bold text-white">Bilan Prévisionnel</h2>
-                  <p className="text-xs text-slate-400">Projection financière indicative</p>
+                  <p className="text-xs text-slate-400">Projection financière personnalisée</p>
                 </div>
                 <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                  Sur 20 ans
+                  Cycle 20 ans
                 </span>
               </div>
+
+              {/* Grid de Métricas Principais */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                  <p className="text-[11px] text-slate-400 mb-1">Production annuelle</p>
+                  <p className="text-base font-bold text-white">{Math.round(productionEstimee)} kWh</p>
+                </div>
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                  <p className="text-[11px] text-amber-300 mb-1">Temps de retour</p>
+                  <p className="text-base font-bold text-amber-400">{payback} ans</p>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex justify-between items-center">
+                <div>
+                  <p className="text-xs font-medium text-emerald-300">Économies estimées / an</p>
+                  <p className="text-xs text-slate-400">Autoconsommation + revente</p>
+                </div>
+                <p className="text-xl font-black text-emerald-400">~{Math.round(economieAnnuelle)} €</p>
+              </div>
+
+              {/* Gráfico Simples de Rentabilidade Cumulativa */}
+              <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
+                <p className="text-xs font-semibold text-slate-300">Cumul des gains estimés</p>
+                
+                <div className="space-y-2 text-xs">
+                  <div>
+                    <div className="flex justify-between text-slate-400 mb-1">
+                      <span>5 ans</span>
+                      <span className="text-slate-200 font-mono">+{Math.round(economieAnnuelle * 5)} €</span>
+                    </div>
+                    <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                      <div className="bg-amber-400 h-full w-1/4 rounded-full"></div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-slate-400 mb-1">
+                      <span>10 ans</span>
+                      <span className="text-slate-200 font-mono">+{Math.round(economieAnnuelle * 10)} €</span>
+                    </div>
+                    <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                      <div className="bg-amber-400 h-full w-2/4 rounded-full"></div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-emerald-400 font-semibold mb-1">
+                      <span>20 ans (Net)</span>
+                      <span className="font-mono">+{Math.round(gain20ans)} €</span>
+                    </div>
+                    <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                      <div className="bg-emerald-400 h-full w-full rounded-full"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Botão de Download */}
+              <div>
+                <button
+                  onClick={handleValidationAndPDF}
+                  disabled={isSaving}
+                  className="w-full bg-amber-500 hover:bg-amber-400 active:scale-[0.99] disabled:opacity-50 text-slate-950 font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-amber-500/20 transition flex items-center justify-center space-x-2 text-sm cursor-pointer"
+                >
+                  <span>📄</span>
+                  <span>{isSaving ? "Génération en cours..." : "Télécharger mon Étude (PDF)"}</span>
+                </button>
+
+                {saveSuccess && (
+                  <p className="mt-3 text-xs text-center text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 rounded-lg py-2">
+                    ✓ Demande enregistrée. Votre étude est en cours de téléchargement.
+                  </p>
+                )}
+
+                <p className="mt-3 text-[11px] text-center text-slate-500">
+                  🔒 Vos données restent confidentielles conformément au RGPD.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* Footer Profissional */}
+      <footer className="border-t border-slate-900 bg-slate-950 py-10 mt-16 text-xs text-slate-500">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center space-x-2">
+            <span>☀️</span>
+            <span className="font-semibold text-slate-300">SOLAR ENERGIE FRANCE</span>
+            <span>—</span>
+            <span>Solutions Photovoltaïques Certifiées</span>
+          </div>
+          <p className="text-center sm:text-right">
+            Étude indicative basée sur les tarifs de rachat EDF OA et données météo 2026.
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+}
 
               {/* Métricas */}
               <div className="space-y-4 mb-6">
