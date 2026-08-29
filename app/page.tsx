@@ -49,7 +49,7 @@ export default function Home() {
       : "N/A";
   const gain20ans = economieAnnuelle * 20 - coutInstallation;
   
-  // Métrica Ecológica: ~50g CO2 evitados por kWh gerado
+  // Métrica Ecológica
   const co2EviteKg = Math.round(productionEstimee * 0.05);
 
   const handlePuissanceChange = (val: number) => {
@@ -175,7 +175,7 @@ export default function Home() {
     doc.setTextColor(67, 56, 202);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
-    doc.text("GAIN ESTIMÉ (20 ANS)", 144, 135);
+    doc.text("GAIN CUMULÉ ESTIMÉ", 144, 135);
     doc.setFontSize(12.5);
     doc.text(`+${Math.round(gain20ans)} €`, 144, 147);
 
@@ -477,7 +477,7 @@ export default function Home() {
                 </div>
               )}
 
-              {/* ÉTAPE 3: Coordonnées & Resultados */}
+              {/* ÉTAPE 3: Coordonnées */}
               {currentStep === 3 && (
                 <div className="space-y-6">
                   <div>
@@ -561,13 +561,13 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Lado Direito: Resultados WOW (Métricas Grandes + Gráfico SVG) */}
+          {/* Lado Direito: Resultados WOW com Linguagem Prudente */}
           <div className="lg:col-span-6">
             <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-2xl backdrop-blur-md sticky top-24 space-y-6">
               <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                 <div>
                   <h2 className="text-lg font-bold text-white">Votre projet solaire</h2>
-                  <p className="text-xs text-slate-400">Bilan instantané et projection financière</p>
+                  <p className="text-xs text-slate-400">Projection financière personnalisée et indicative</p>
                 </div>
                 <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                   Étude Indicative
@@ -587,7 +587,7 @@ export default function Home() {
                 <div className="flex justify-between items-center p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                   <div className="flex items-center gap-2.5">
                     <span className="text-base">💰</span>
-                    <span className="text-emerald-300 font-medium">Économies</span>
+                    <span className="text-emerald-300 font-medium">Économies estimées</span>
                   </div>
                   <span className="font-bold text-emerald-400 font-mono">~{Math.round(economieAnnuelle).toLocaleString("fr-FR")} €/an</span>
                 </div>
@@ -595,7 +595,7 @@ export default function Home() {
                 <div className="flex justify-between items-center p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
                   <div className="flex items-center gap-2.5">
                     <span className="text-base">📈</span>
-                    <span className="text-amber-300 font-medium">Rentabilité</span>
+                    <span className="text-amber-300 font-medium">Temps de retour indicatif</span>
                   </div>
                   <span className="font-bold text-amber-400 font-mono">{payback} ans</span>
                 </div>
@@ -609,22 +609,20 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Gráfico de Rentabilidade em 20 Anos (SVG Curva Financeira) */}
+              {/* Gráfico de Rentabilidade com Nomenclatura Prudente */}
               <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
                 <div className="flex justify-between items-center">
                   <p className="text-xs font-semibold text-slate-300">Votre investissement sur 20 ans</p>
-                  <span className="text-xs font-bold text-emerald-400 font-mono">Gain Net : +{Math.round(gain20ans).toLocaleString("fr-FR")} €</span>
+                  <span className="text-xs font-bold text-emerald-400 font-mono">Gain cumulé estimé : +{Math.round(gain20ans).toLocaleString("fr-FR")} €</span>
                 </div>
 
                 <div className="h-32 w-full pt-2">
                   <svg className="w-full h-full overflow-visible" viewBox="0 0 300 90">
-                    {/* Linha Zero (Break-even) */}
                     <line x1="25" y1="45" x2="295" y2="45" stroke="#334155" strokeWidth="1" strokeDasharray="3 3" />
                     <text x="0" y="48" fill="#64748b" fontSize="8" fontFamily="monospace">0€</text>
                     <text x="0" y="16" fill="#10b981" fontSize="8" fontFamily="monospace">+10k€</text>
                     <text x="0" y="80" fill="#f43f5e" fontSize="8" fontFamily="monospace">-5k€</text>
 
-                    {/* Curva de Ganho Cumulativo */}
                     <path
                       d="M 30 75 Q 120 45, 290 12"
                       fill="none"
@@ -632,22 +630,19 @@ export default function Home() {
                       strokeWidth="2.5"
                     />
 
-                    {/* Ponto Inicial (Investimento) */}
                     <circle cx="30" cy="75" r="3.5" fill="#f43f5e" />
                     <text x="30" y="88" fill="#94a3b8" fontSize="7" textAnchor="middle">0 an</text>
 
-                    {/* Ponto de Retorno (Break-Even) */}
                     <circle cx="125" cy="45" r="4" fill="#fbbf24" stroke="#0f172a" strokeWidth="1.5" />
                     <text x="125" y="58" fill="#fbbf24" fontSize="7" fontWeight="bold" textAnchor="middle">{payback}a</text>
 
-                    {/* Ponto Final (20 Anos) */}
                     <circle cx="290" cy="12" r="4" fill="#10b981" stroke="#0f172a" strokeWidth="1.5" />
                     <text x="285" y="24" fill="#10b981" fontSize="7" fontWeight="bold" textAnchor="end">20 ans</text>
                   </svg>
                 </div>
               </div>
 
-              {/* Botão de Ação Direta caso esteja no Passo 3 */}
+              {/* Botão de Ação Direta */}
               {currentStep === 3 && (
                 <div>
                   <button
