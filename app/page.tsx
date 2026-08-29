@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import jsPDF from "jspdf";
+import Link from "next/link";
 
 export default function Home() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -376,7 +377,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#fafafa] text-zinc-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
-      {/* Navbar Minimalista B2B */}
+      {/* Navbar Minimalista B2B com link para /pro */}
       <header className="border-b border-zinc-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
@@ -388,10 +389,12 @@ export default function Home() {
             </span>
           </div>
           <div className="flex items-center space-x-3">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-zinc-100 text-zinc-700 border border-zinc-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-              Barème Officiel 2026
-            </span>
+            <Link
+              href="/pro"
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 border border-blue-200/60 rounded-lg px-3 py-1.5 transition"
+            >
+              Vous êtes installateur ? Espace Pro →
+            </Link>
           </div>
         </div>
       </header>
