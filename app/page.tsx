@@ -48,6 +48,9 @@ export default function Home() {
       ? (coutInstallation / economieAnnuelle).toFixed(1)
       : "N/A";
   const gain20ans = economieAnnuelle * 20 - coutInstallation;
+  
+  // Métrica Ecológica: ~50g CO2 evitados por kWh gerado
+  const co2EviteKg = Math.round(productionEstimee * 0.05);
 
   const handlePuissanceChange = (val: number) => {
     setPuissanceKw(val);
@@ -304,7 +307,7 @@ export default function Home() {
         {/* Wizard Multi-Step Form */}
         <div id="simulateur" className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Lado Esquerdo: Formulário em Etapas */}
-          <div className="lg:col-span-7 space-y-6">
+          <div className="lg:col-span-6 space-y-6">
             <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl backdrop-blur-sm">
               {/* Stepper Progress Bar */}
               <div className="mb-8">
@@ -474,7 +477,7 @@ export default function Home() {
                 </div>
               )}
 
-              {/* ÉTAPE 3: Coordonnées & Résultats */}
+              {/* ÉTAPE 3: Coordonnées & Resultados */}
               {currentStep === 3 && (
                 <div className="space-y-6">
                   <div>
@@ -558,85 +561,114 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Lado Direito: Bilan Prévisionnel */}
-          <div className="lg:col-span-5">
+          {/* Lado Direito: Resultados WOW (Métricas Grandes + Gráfico SVG) */}
+          <div className="lg:col-span-6">
             <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-2xl backdrop-blur-md sticky top-24 space-y-6">
               <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                 <div>
-                  <h2 className="text-lg font-bold text-white">Bilan Prévisionnel</h2>
-                  <p className="text-xs text-slate-400">Projection financière personnalisée</p>
+                  <h2 className="text-lg font-bold text-white">Votre projet solaire</h2>
+                  <p className="text-xs text-slate-400">Bilan instantané et projection financière</p>
                 </div>
-                <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                  Cycle 20 ans
+                <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  Étude Indicative
                 </span>
               </div>
 
-              {/* Grid de Métricas Principais */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800">
-                  <p className="text-[11px] text-slate-400 mb-1">Production annuelle</p>
-                  <p className="text-base font-bold text-white">{Math.round(productionEstimee)} kWh</p>
+              {/* Tabela de Métricas WOW */}
+              <div className="space-y-2.5 text-sm">
+                <div className="flex justify-between items-center p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-base">☀️</span>
+                    <span className="text-slate-300 font-medium">Production</span>
+                  </div>
+                  <span className="font-bold text-white font-mono">{Math.round(productionEstimee).toLocaleString("fr-FR")} kWh/an</span>
                 </div>
-                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                  <p className="text-[11px] text-amber-300 mb-1">Temps de retour</p>
-                  <p className="text-base font-bold text-amber-400">{payback} ans</p>
+
+                <div className="flex justify-between items-center p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-base">💰</span>
+                    <span className="text-emerald-300 font-medium">Économies</span>
+                  </div>
+                  <span className="font-bold text-emerald-400 font-mono">~{Math.round(economieAnnuelle).toLocaleString("fr-FR")} €/an</span>
+                </div>
+
+                <div className="flex justify-between items-center p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-base">📈</span>
+                    <span className="text-amber-300 font-medium">Rentabilité</span>
+                  </div>
+                  <span className="font-bold text-amber-400 font-mono">{payback} ans</span>
+                </div>
+
+                <div className="flex justify-between items-center p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-base">🌱</span>
+                    <span className="text-slate-300 font-medium">CO₂ évité</span>
+                  </div>
+                  <span className="font-bold text-emerald-400 font-mono">~{co2EviteKg.toLocaleString("fr-FR")} kg/an</span>
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex justify-between items-center">
+              {/* Gráfico de Rentabilidade em 20 Anos (SVG Curva Financeira) */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                <div className="flex justify-between items-center">
+                  <p className="text-xs font-semibold text-slate-300">Votre investissement sur 20 ans</p>
+                  <span className="text-xs font-bold text-emerald-400 font-mono">Gain Net : +{Math.round(gain20ans).toLocaleString("fr-FR")} €</span>
+                </div>
+
+                <div className="h-32 w-full pt-2">
+                  <svg className="w-full h-full overflow-visible" viewBox="0 0 300 90">
+                    {/* Linha Zero (Break-even) */}
+                    <line x1="25" y1="45" x2="295" y2="45" stroke="#334155" strokeWidth="1" strokeDasharray="3 3" />
+                    <text x="0" y="48" fill="#64748b" fontSize="8" fontFamily="monospace">0€</text>
+                    <text x="0" y="16" fill="#10b981" fontSize="8" fontFamily="monospace">+10k€</text>
+                    <text x="0" y="80" fill="#f43f5e" fontSize="8" fontFamily="monospace">-5k€</text>
+
+                    {/* Curva de Ganho Cumulativo */}
+                    <path
+                      d="M 30 75 Q 120 45, 290 12"
+                      fill="none"
+                      stroke="#f59e0b"
+                      strokeWidth="2.5"
+                    />
+
+                    {/* Ponto Inicial (Investimento) */}
+                    <circle cx="30" cy="75" r="3.5" fill="#f43f5e" />
+                    <text x="30" y="88" fill="#94a3b8" fontSize="7" textAnchor="middle">0 an</text>
+
+                    {/* Ponto de Retorno (Break-Even) */}
+                    <circle cx="125" cy="45" r="4" fill="#fbbf24" stroke="#0f172a" strokeWidth="1.5" />
+                    <text x="125" y="58" fill="#fbbf24" fontSize="7" fontWeight="bold" textAnchor="middle">{payback}a</text>
+
+                    {/* Ponto Final (20 Anos) */}
+                    <circle cx="290" cy="12" r="4" fill="#10b981" stroke="#0f172a" strokeWidth="1.5" />
+                    <text x="285" y="24" fill="#10b981" fontSize="7" fontWeight="bold" textAnchor="end">20 ans</text>
+                  </svg>
+                </div>
+              </div>
+
+              {/* Botão de Ação Direta caso esteja no Passo 3 */}
+              {currentStep === 3 && (
                 <div>
-                  <p className="text-xs font-medium text-emerald-300">Économies estimées / an</p>
-                  <p className="text-xs text-slate-400">Autoconsommation + revente</p>
+                  <button
+                    onClick={handleValidationAndPDF}
+                    disabled={isSaving}
+                    className="w-full bg-amber-500 hover:bg-amber-400 active:scale-[0.99] disabled:opacity-50 text-slate-950 font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-amber-500/20 transition flex items-center justify-center space-x-2 text-sm cursor-pointer"
+                  >
+                    <span>📄</span>
+                    <span>{isSaving ? "Génération en cours..." : "Télécharger mon Étude (PDF)"}</span>
+                  </button>
+
+                  {saveSuccess && (
+                    <p className="mt-3 text-xs text-center text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 rounded-lg py-2">
+                      ✓ Demande enregistrée. Votre étude est en cours de téléchargement.
+                    </p>
+                  )}
                 </div>
-                <p className="text-xl font-black text-emerald-400">~{Math.round(economieAnnuelle)} €</p>
-              </div>
-
-              {/* Gráfico Simples de Rentabilidade */}
-              <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-3">
-                <p className="text-xs font-semibold text-slate-300">Cumul des gains estimés</p>
-                
-                <div className="space-y-2 text-xs">
-                  <div>
-                    <div className="flex justify-between text-slate-400 mb-1">
-                      <span>5 ans</span>
-                      <span className="text-slate-200 font-mono">+{Math.round(economieAnnuelle * 5)} €</span>
-                    </div>
-                    <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                      <div className="bg-amber-400 h-full w-1/4 rounded-full"></div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-slate-400 mb-1">
-                      <span>10 ans</span>
-                      <span className="text-slate-200 font-mono">+{Math.round(economieAnnuelle * 10)} €</span>
-                    </div>
-                    <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                      <div className="bg-amber-400 h-full w-2/4 rounded-full"></div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-emerald-400 font-semibold mb-1">
-                      <span>20 ans (Net)</span>
-                      <span className="font-mono">+{Math.round(gain20ans)} €</span>
-                    </div>
-                    <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                      <div className="bg-emerald-400 h-full w-full rounded-full"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Feedback e Segurança */}
-              {saveSuccess && (
-                <p className="text-xs text-center text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 rounded-lg py-2">
-                  ✓ Demande enregistrée. Votre étude est en cours de téléchargement.
-                </p>
               )}
 
               <p className="text-[11px] text-center text-slate-500">
-                🔒 Vos données restent confidentielles conformément au RGPD.
+                🔒 Vos données restent strictement confidentielles conformément au RGPD.
               </p>
             </div>
           </div>
