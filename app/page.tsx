@@ -218,19 +218,89 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Hero Section */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 mb-4">
-            <span>⚡ Simulateur d&apos;Autoconsommation Photovoltaïque</span>
+      {/* Hero Section Comercial */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center mb-16 pb-12 border-b border-slate-800/80">
+          
+          {/* Lado Esquerdo: Proposta de Valor */}
+          <div className="lg:col-span-7 space-y-5">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              <span>☀️ SOLAR ENERGIE</span>
+            </div>
+            
+            <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
+              Votre projet solaire, <br />
+              <span className="text-amber-400">chiffré en 60 secondes.</span>
+            </h1>
+            
+            <p className="text-slate-400 text-sm sm:text-base max-w-xl leading-relaxed">
+              Estimez votre production photovoltaïque, vos économies annuelles et votre temps de retour sur investissement selon les barèmes en vigueur.
+            </p>
+
+            <div className="pt-2">
+              <a
+                href="#simulateur"
+                className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-6 py-3 rounded-xl shadow-lg shadow-amber-500/20 transition transform active:scale-95 text-sm"
+              >
+                <span>Calculer mon projet gratuitement</span>
+                <span>→</span>
+              </a>
+            </div>
+
+            {/* Bullets de Confiança */}
+            <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-300 font-medium">
+              <div className="flex items-center gap-2">
+                <span className="text-emerald-400 font-bold">✓</span>
+                <span>Estimation personnalisée</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-emerald-400 font-bold">✓</span>
+                <span>Résultats instantanés</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-emerald-400 font-bold">✓</span>
+                <span>Étude PDF disponible</span>
+              </div>
+            </div>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-4 leading-tight">
-            Calculez votre rentabilité solaire en <span className="text-amber-400">60 secondes</span>
-          </h1>
-          <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
-            Estimez votre production annuelle, vos économies d&apos;électricité et générez votre dossier d&apos;étude complet en PDF instantanément.
-          </p>
+
+          {/* Lado Direito: Mockup / Preview do Card de Resultado */}
+          <div className="lg:col-span-5">
+            <div className="relative mx-auto max-w-sm rounded-2xl bg-gradient-to-b from-slate-800/60 to-slate-900/90 p-5 border border-slate-700/60 shadow-2xl backdrop-blur-xl">
+              <div className="flex items-center justify-between border-b border-slate-700/60 pb-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
+                </div>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                  Aperçu de l&apos;Étude
+                </span>
+              </div>
+
+              <div className="space-y-3 font-mono text-xs">
+                <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+                  <p className="text-[11px] text-slate-400">Production estimée</p>
+                  <p className="text-base font-bold text-white">4 500 kWh / an</p>
+                </div>
+
+                <div className="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">
+                  <p className="text-[11px] text-emerald-300">Économies estimées</p>
+                  <p className="text-base font-bold text-emerald-400">~820 € / an</p>
+                </div>
+
+                <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+                  <p className="text-[11px] text-slate-400">Temps de retour</p>
+                  <p className="text-base font-bold text-amber-400">9.8 ans</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
+
+        {/* Ancora para scroll suave */}
+        <div id="simulateur"></div>
 
         {/* Grid Container */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
