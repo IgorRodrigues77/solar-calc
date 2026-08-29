@@ -27,8 +27,9 @@ export async function POST(req: Request) {
 
     const ai = new GoogleGenAI({ apiKey });
 
+    // Chamada configurada com o modelo gemini-3.6-flash
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.6-flash",
       contents: [
         {
           role: "user",
