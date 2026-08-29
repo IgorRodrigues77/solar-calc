@@ -169,25 +169,37 @@ export default function Home() {
     setExtractedBillData(null);
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
+      // 1. Extração do texto no navegador via PDF.js
+      const pdfjs = await import("pdfjs-dist");
+      pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+      let extractedFullText = "";
+
+      for (let i = 1; i <= Math.min(pdf.numPages, 3); i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(" ");
+        extractedFullText += `\n--- Page ${i} ---\n` + pageText;
+      }
+
+      // 2. Envio do texto leve para estruturação via IA
       const res = await fetch("/api/parse-bill", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: extractedFullText }),
       });
 
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur d'analyse");
 
-      if (!res.ok) {
-        throw new Error(data.error || "Erreur lors de l'analyse.");
-      }
-
-      // Aplicação dos valores se encontrados
+      // 3. Preenchimento automático dos dados
       if (data.nom) setNomClient(data.nom);
       if (data.adresse) {
         setAddressInput(data.adresse);
-        // Tenta geocodificar o endereço encontrado
         try {
           const geoRes = await fetch(
             `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(data.adresse)}&limit=1`
@@ -197,7 +209,7 @@ export default function Home() {
             handleSelectAddress(geoData.features[0]);
           }
         } catch (geoErr) {
-          console.warn("Geocodage auto ignoré:", geoErr);
+          console.warn("Geocodage:", geoErr);
         }
       }
 
@@ -214,8 +226,8 @@ export default function Home() {
         puissanceRec: data.conso ? (data.conso <= 4000 ? 3 : data.conso <= 8000 ? 6 : 9) : undefined,
       });
     } catch (err: any) {
-      console.error("Erreur lecture facture:", err);
-      alert(`Échec de l'analyse : ${err.message || "Impossible de lire le document."}`);
+      console.error("Erreur facture:", err);
+      alert(`Échec : ${err.message || "Document illisible"}`);
     } finally {
       setIsParsingBill(false);
       if (fileInputRef.current) fileInputRef.current.value = "";

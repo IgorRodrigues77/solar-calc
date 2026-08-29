@@ -1,59 +1,52 @@
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: "GEMINI_API_KEY non configurée sur Vercel." },
+        { error: "GEMINI_API_KEY non configurée." },
         { status: 500 }
       );
     }
 
-    const formData = await req.formData();
-    const file = formData.get("file") as File;
+    const { text } = await req.json();
 
-    if (!file) {
-      return NextResponse.json({ error: "Aucun fichier reçu." }, { status: 400 });
+    if (!text || typeof text !== "string" || text.trim().length === 0) {
+      return NextResponse.json(
+        { error: "Aucun texte extrait du document." },
+        { status: 400 }
+      );
     }
 
-    const arrayBuffer = await file.arrayBuffer();
-    const base64Data = Buffer.from(arrayBuffer).toString("base64");
-    const mimeType = file.type || "application/pdf";
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
-    // Endpoint corrigido com gemini-3.6-flash
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
-
-    const prompt = `Vous êtes un moteur OCR expert en extraction de factures d'énergie françaises (EDF, TotalEnergies, Engie, Enedis).
-Analysez le document fourni et retournez STRICTEMENT un JSON valide avec cette structure exacte :
+    const prompt = `Vous êtes un système OCR d'extraction de factures d'énergie françaises (EDF, TotalEnergies, Engie, Enedis).
+Analysez le texte suivant issu d'une facture et extrayez STRICTEMENT un objet JSON valide :
 {
-  "nom": string ou null (Nom et prénom complet du titulaire),
-  "adresse": string ou null (Adresse complète du lieu de consommation avec numéro, voie, code postal et ville),
-  "conso": number ou null (Consommation annuelle totale en kWh ou CAR si explicitement mentionnée)
+  "nom": string ou null,
+  "adresse": string ou null,
+  "conso": number ou null
 }
-Ne générez AUCUN texte en dehors du JSON. Si une information est absente, mettez null.`;
+
+Règles :
+1. "nom" : nom et prénom du titulaire (ex: PIERRE BOKOBZA). Si absent, null.
+2. "adresse" : adresse physique complète du lieu de consommation (rue, code postal, ville). Si absent, null.
+3. "conso" : consommation annuelle en kWh (CAR ou total annuel). Si absent, null.
+Ne renvoyez RIEN d'autre que l'objet JSON.
+
+Texte de la facture :
+"""
+${text.slice(0, 10000)}
+"""`;
 
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                inline_data: {
-                  mime_type: mimeType,
-                  data: base64Data,
-                },
-              },
-              { text: prompt },
-            ],
-          },
-        ],
+        contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           response_mime_type: "application/json",
           temperature: 0.1,
@@ -62,19 +55,13 @@ Ne générez AUCUN texte en dehors du JSON. Si une information est absente, mett
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Gemini API Error:", errorText);
-      return NextResponse.json(
-        { error: `Erreur API (${response.status}): ${errorText.slice(0, 180)}` },
-        { status: response.status }
-      );
+      const err = await response.text();
+      return NextResponse.json({ error: `Erreur API: ${err.slice(0, 100)}` }, { status: 500 });
     }
 
     const data = await response.json();
-    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-    
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    const result = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+    const rawJson = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    const result = JSON.parse(rawJson);
 
     return NextResponse.json({
       nom: result.nom || null,
@@ -82,9 +69,8 @@ Ne générez AUCUN texte en dehors du JSON. Si une information est absente, mett
       conso: typeof result.conso === "number" ? result.conso : null,
     });
   } catch (error: any) {
-    console.error("Server Crash Handled:", error);
     return NextResponse.json(
-      { error: error?.message || "Erreur interne lors du traitement du fichier." },
+      { error: error?.message || "Erreur interne" },
       { status: 500 }
     );
   }
