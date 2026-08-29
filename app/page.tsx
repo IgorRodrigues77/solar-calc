@@ -490,10 +490,12 @@ export default function Home() {
             </span>
           </div>
           <div className="flex items-center space-x-3">
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-zinc-100 text-zinc-700 border border-zinc-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              Données PVGIS 5.2
-            </span>
+            <Link
+              href="/dashboard"
+              className="text-xs font-semibold text-zinc-700 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 rounded-lg px-3 py-1.5 transition"
+            >
+              📁 Mes Projets
+            </Link>
             <Link
               href="/pro"
               className="text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 border border-blue-200/60 rounded-lg px-3 py-1.5 transition"
