@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // Limite de 10 MB
 
@@ -126,7 +126,7 @@ RÈGLES D'EXTRACTION STRICTES :
 Ne renvoyez ABSOLUMENT AUCUN texte avant ou après l'objet JSON.`;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 55000); // 55s timeout
 
     const geminiRes = await fetch(url, {
       method: "POST",
