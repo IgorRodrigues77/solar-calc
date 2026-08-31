@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import jsPDF from "jspdf";
 import Link from "next/link";
+import HypothesesCalcul from "@/components/HypothesesCalcul";
 
 interface AddressSuggestion {
   label: string;
