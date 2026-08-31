@@ -1306,6 +1306,17 @@ export default function Home() {
               </p>
             </div>
 
+            <HypothesesCalcul
+  puissanceKw={9}
+  consoAnnuelle={4200}
+  productionAnnuelle={12600}
+  productibleKwhKwc={1400}
+  coutTTC={18000}
+  primeAutoconsommation={2070}
+  economieAnnuelle={1691}
+  anneesROI={10.6}
+/>
+
             <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm relative">
               <span className="text-xs font-mono font-bold text-blue-600 block mb-3">04</span>
               <h3 className="text-base font-bold text-zinc-900 mb-2">Étude White-Label</h3>
