@@ -158,10 +158,11 @@
 
       const safeName = (nomClient || "projet").trim().replace(/[^\p{L}\p{N}\-_ ]/gu, "").replace(/\s+/g, "_").slice(0, 80);
       doc.save(`pre-etude-photovoltaique-${safeName || "projet"}.pdf`);
+    } catch (error) {
+      console.error("Erreur lors de la génération du PDF:", error);
     } finally {
       setIsGeneratingPdf(false);
     }
-  };
 
   return (
     <div className="min-h-screen bg-[#fafafa] text-zinc-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
