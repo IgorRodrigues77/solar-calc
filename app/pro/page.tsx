@@ -7,11 +7,24 @@ export default function ProLandingPage() {
   const [companyName, setCompanyName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [commercialCount, setCommercialCount] = useState("1-5");
+  const [monthlyStudies, setMonthlyStudies] = useState("10-30");
+  const [currentTool, setCurrentTool] = useState("Logiciel spécialisé");
   const [submitted, setSubmitted] = useState(false);
 
   const handleSubmitDemo = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!companyName || !contactEmail) return;
+    if (!companyName.trim() || !contactEmail.trim()) return;
+    const request = {
+      id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now()),
+      created_at: new Date().toISOString(),
+      companyName: companyName.trim(),
+      contactEmail: contactEmail.trim(),
+      commercialCount,
+      monthlyStudies,
+      currentTool,
+    };
+    const existing = JSON.parse(localStorage.getItem("solar_demo_requests") || "[]");
+    localStorage.setItem("solar_demo_requests", JSON.stringify([request, ...existing].slice(0, 50)));
     setSubmitted(true);
   };
 
@@ -52,10 +65,10 @@ export default function ProLandingPage() {
             Solution SaaS pour Installateurs & Réseaux Solaires
           </span>
           <h1 className="text-4xl sm:text-5xl font-extrabold text-zinc-950 tracking-tight leading-[1.15] mb-5">
-            Accélérez vos ventes photovoltaïques avec un outil de chiffrage instantané.
+            Préparez vos pré-études photovoltaïques plus rapidement avec un outil de chiffrage instantané.
           </h1>
           <p className="text-zinc-600 text-base sm:text-lg leading-relaxed mb-8">
-            Équipez vos commerciaux d&apos;une application moderne pour dimensionner les projets en rendez-vous client et générer automatiquement des dossiers d&apos;ingénierie certifiés de 5 pages à votre marque.
+            Importez la facture de votre client, préparez une pré-étude photovoltaïque, comparez plusieurs scénarios et générez un rapport professionnel à votre marque.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -63,7 +76,7 @@ export default function ProLandingPage() {
               href="#demo"
               className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition text-center text-sm shadow-sm"
             >
-              Demander un accès démo commercial →
+              Demander une démonstration →
             </a>
             <Link
               href="/"
@@ -74,6 +87,43 @@ export default function ProLandingPage() {
           </div>
         </div>
 
+        {/* Workflow B2B */}
+        <section className="mb-20">
+          <div className="max-w-2xl mb-8">
+            <span className="text-xs font-semibold uppercase tracking-wider text-blue-600 block mb-2">Workflow</span>
+            <h2 className="text-2xl sm:text-3xl font-bold text-zinc-950 tracking-tight">
+              Du PDF client au rapport en quelques étapes.
+            </h2>
+            <p className="text-sm text-zinc-500 mt-2">
+              Réduisez la saisie répétitive avant le rendez-vous sans remplacer votre expertise technique.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="bg-white border border-zinc-200 rounded-2xl p-6">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-4">Avant</p>
+              <div className="space-y-2 text-sm text-zinc-600">
+                {["Facture PDF reçue", "Lecture et saisie manuelles", "Calcul / PVGIS / mise en page", "Rapport client"].map((item, i) => (
+                  <div key={item}>
+                    <div className="rounded-xl bg-zinc-50 p-3">{item}</div>
+                    {i < 3 && <div className="text-zinc-300 pl-4 py-1">↓</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="bg-zinc-950 text-white rounded-2xl p-6">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-4">Avec Solar Energie</p>
+              <div className="space-y-2 text-sm">
+                {["Import de la facture", "Données détectées et vérifiées", "PVGIS + comparaison des scénarios", "Rapport PDF à votre marque"].map((item, i) => (
+                  <div key={item}>
+                    <div className={`rounded-xl p-3 ${i === 3 ? "bg-blue-600 font-semibold" : "bg-white/10"}`}>{item}</div>
+                    {i < 3 && <div className="text-zinc-500 pl-4 py-1">↓</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* 3 Pilares B2B */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-24">
           <div className="bg-white border border-zinc-200/80 rounded-2xl p-7 shadow-sm">
@@ -82,7 +132,7 @@ export default function ProLandingPage() {
             </div>
             <h3 className="text-base font-bold text-zinc-900 mb-2">Chiffrage Express en RDV</h3>
             <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
-              Vos conseillers dimensionnent la puissance et le coût en 60 secondes face au prospect, sans logiciel d&apos;ingénierie complexe.
+              Vos conseillers dimensionnent la puissance et le coût rapidement face au prospect, sans multiplier les saisies manuelles.
             </p>
           </div>
 
@@ -90,9 +140,9 @@ export default function ProLandingPage() {
             <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-5 font-bold">
               02
             </div>
-            <h3 className="text-base font-bold text-zinc-900 mb-2">Dossier PDF White-Label</h3>
+            <h3 className="text-base font-bold text-zinc-900 mb-2">Rapport PDF White-Label</h3>
             <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
-              Exportez des études de 5 pages aux couleurs et logos de votre entreprise intégrant vos barèmes de marge et garanties matérielles.
+              Exportez un rapport de pré-étude de 5 pages aux couleurs et au logo de votre entreprise, avec les coordonnées de contact configurées dans votre espace Pro.
             </p>
           </div>
 
@@ -100,9 +150,9 @@ export default function ProLandingPage() {
             <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-5 font-bold">
               03
             </div>
-            <h3 className="text-base font-bold text-zinc-900 mb-2">Capture de Leads Qualifiés</h3>
+            <h3 className="text-base font-bold text-zinc-900 mb-2">Import de facture</h3>
             <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
-              Intégrez le simulateur en widget sur votre site web pour collecter des coordonnées complètes avec données de consommation préalables.
+              Déposez une facture PDF pour récupérer automatiquement les informations disponibles et réduire la saisie avant la simulation.
             </p>
           </div>
         </div>
@@ -114,13 +164,13 @@ export default function ProLandingPage() {
               Demande de démonstration
             </h2>
             <p className="text-xs text-zinc-500">
-              Découvrez comment déployer la plateforme auprès de votre force commerciale.
+              Montrez-nous comment vous préparez vos études aujourd'hui et découvrez le workflow proposé.
             </p>
           </div>
 
           {submitted ? (
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 text-center text-emerald-800 text-sm">
-              ✓ Votre demande a été enregistrée. Notre équipe vous recontactera sous 24h ouvrées.
+              ✓ Merci. Vos informations ont bien été enregistrées pour cette démonstration.
             </div>
           ) : (
             <form onSubmit={handleSubmitDemo} className="space-y-4">
@@ -165,6 +215,40 @@ export default function ProLandingPage() {
                   <option value="6-15">6 à 15 commerciaux</option>
                   <option value="15+">Plus de 15 commerciaux / Réseau</option>
                 </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1">
+                    Nombre d'études par mois
+                  </label>
+                  <select
+                    value={monthlyStudies}
+                    onChange={(e) => setMonthlyStudies(e.target.value)}
+                    className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-4 py-2.5 text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
+                  >
+                    <option>1-10</option>
+                    <option>10-30</option>
+                    <option>30-100</option>
+                    <option>100+</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1">
+                    Outil utilisé aujourd'hui
+                  </label>
+                  <select
+                    value={currentTool}
+                    onChange={(e) => setCurrentTool(e.target.value)}
+                    className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-4 py-2.5 text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
+                  >
+                    <option>Excel</option>
+                    <option>PVGIS</option>
+                    <option>Logiciel spécialisé</option>
+                    <option>Manuellement</option>
+                    <option>Autre</option>
+                  </select>
+                </div>
               </div>
 
               <button

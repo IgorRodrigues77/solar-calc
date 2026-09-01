@@ -36,6 +36,14 @@ export default function CompanySettings() {
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (!["image/png", "image/jpeg"].includes(file.type)) {
+        alert("Veuillez sélectionner un logo PNG ou JPG.");
+        return;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        alert("Le logo doit faire au maximum 2 Mo.");
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (event) => {
         setLogoBase64(event.target?.result as string);
@@ -94,7 +102,7 @@ export default function CompanySettings() {
             Profil de votre Entreprise
           </h1>
           <p className="text-zinc-500 text-sm mt-1">
-            Ces coordonnées apparaîtront automatiquement sur tous vos dossiers PDF d&apos;ingénierie.
+            Ces coordonnées et votre logo apparaîtront automatiquement sur vos rapports PDF white-label.
           </p>
         </div>
 

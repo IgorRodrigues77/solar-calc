@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import jsPDF from "jspdf";
 import Link from "next/link";
-import HypothesesCalcul from "@/components/HypothesesCalcul";
+import { calculateSolarScenario, getRecommendedPower, getInstallationCost, DEFAULT_PRICES } from "./lib/solarCalculations";
+
 
 interface AddressSuggestion {
   label: string;
@@ -63,6 +64,7 @@ export default function Home() {
   // Dados Técnicos e Solares Reais (PVGIS)
   const [region, setRegion] = useState("Île-de-France / Nord");
   const [productible, setProductible] = useState(1050);
+  const [pvgisError, setPvgisError] = useState("");
   const [puissanceKw, setPuissanceKw] = useState(6);
   const [consoAnnuelle, setConsoAnnuelle] = useState(4800);
   const [coutInstallation, setCoutInstallation] = useState(13000);
@@ -108,27 +110,27 @@ export default function Home() {
 
   const fetchPvgisData = async (lat: number, lon: number, kw: number) => {
     setIsLoadingPvgis(true);
+    setPvgisError("");
     try {
-      const pvgisUrl = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${lat}&lon=${lon}&peakpower=${kw}&loss=14&optimalinclination=1&outputformat=json`;
+      const pvgisUrl = `https://re.jrc.ec.europa.eu/api/v5_3/PVcalc?lat=${lat}&lon=${lon}&peakpower=${kw}&loss=14&optimalinclination=1&outputformat=json`;
       const res = await fetch(pvgisUrl);
+      if (!res.ok) throw new Error(`PVGIS HTTP ${res.status}`);
       const data = await res.json();
-
-      if (data?.outputs?.totals?.fixed?.E_y) {
-        const annualYield = data.outputs.totals.fixed.E_y;
-        const calculatedProductible = Math.round(annualYield / kw);
-        setProductible(calculatedProductible);
+      const annualYield = data?.outputs?.totals?.fixed?.E_y;
+      if (typeof annualYield !== "number" || annualYield <= 0) {
+        throw new Error("PVGIS n'a pas retourné une production annuelle exploitable.");
       }
+      setProductible(Math.round(annualYield / kw));
     } catch (err) {
-      console.warn("PVGIS API fallback:", err);
-      if (lat < 44.5) setProductible(1400);
-      else if (lat < 46.5) setProductible(1250);
-      else setProductible(1000);
+      console.warn("Erreur PVGIS:", err);
+      setPvgisError("Les données solaires du site n'ont pas pu être récupérées. Vérifiez l'adresse ou réessayez.");
     } finally {
       setIsLoadingPvgis(false);
     }
   };
 
   const handleSelectAddress = (addr: AddressSuggestion) => {
+    setPvgisError("");
     setSelectedAddress(addr);
     setAddressInput(addr.label);
     setSuggestions([]);
@@ -151,9 +153,7 @@ export default function Home() {
 
   const handlePuissanceChange = (val: number) => {
     setPuissanceKw(val);
-    if (val === 3) setCoutInstallation(7500);
-    else if (val === 6) setCoutInstallation(13000);
-    else if (val === 9) setCoutInstallation(18000);
+    setCoutInstallation(getInstallationCost(val));
 
     if (selectedAddress) {
       const [lon, lat] = selectedAddress.coordinates;
@@ -168,8 +168,13 @@ export default function Home() {
 
     setIsParsingBill(true);
     setExtractedBillData(null);
+    setErrorMsg("");
 
     try {
+      if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+        throw new Error("Veuillez sélectionner une facture au format PDF.");
+      }
+
       const formData = new FormData();
       formData.append("file", file);
 
@@ -177,78 +182,55 @@ export default function Home() {
         method: "POST",
         body: formData,
       });
-
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok && !data.nom && !data.adresse) {
-        throw new Error(data.error || "Erreur lors de l'analyse.");
+        throw new Error(data.error || "Impossible d'analyser cette facture.");
       }
 
-      // Preenchimento do titular (se encontrado)
-      if (data.nom) {
-        setNomClient(data.nom);
-      }
+      if (data.nom) setNomClient(data.nom);
 
-      // Preenchimento e geocodificação do endereço (se encontrado)
       if (data.adresse) {
         setAddressInput(data.adresse);
         try {
           const geoRes = await fetch(
             `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(data.adresse)}&limit=1`
           );
-          const geoData = await geoRes.json();
-          if (geoData.features && geoData.features.length > 0) {
-            handleSelectAddress(geoData.features[0]);
+          if (geoRes.ok) {
+            const geoData = await geoRes.json();
+            if (geoData.features?.length > 0) handleSelectAddress(geoData.features[0]);
           }
         } catch (geoErr) {
-          console.warn("Geocodage automatique ignoré:", geoErr);
+          console.warn("Géocodage automatique ignoré:", geoErr);
         }
       }
 
-      // Preenchimento do consumo somente se auditado e válido
+      let puissanceRec: number | undefined;
       if (typeof data.conso === "number" && data.conso > 0) {
         setConsoAnnuelle(data.conso);
-        const recKw = data.conso <= 4000 ? 3 : data.conso <= 8000 ? 6 : 9;
-        handlePuissanceChange(recKw);
+        puissanceRec = getRecommendedPower(data.conso);
+        handlePuissanceChange(puissanceRec);
       }
 
-      // Atualização do card de status no frontend
       setExtractedBillData({
-        nom: data.nom || "Non détecté",
-        adresse: data.adresse || "Non détectée",
-        conso: data.conso || undefined,
-        puissanceRec: data.conso ? (data.conso <= 4000 ? 3 : data.conso <= 8000 ? 6 : 9) : undefined,
+        nom: data.nom || undefined,
+        adresse: data.adresse || undefined,
+        conso: typeof data.conso === "number" ? data.conso : undefined,
+        puissanceRec,
       });
 
-      // Se houver aviso de consumo ausente na fatura, orienta o usuário
-      if (!data.success && data.error) {
-        alert(data.error);
-      }
-    } catch (err: any) {
+      if (!data.success && data.error) setErrorMsg(data.error);
+    } catch (err) {
       console.error("Erreur lecture facture:", err);
-      alert(err.message || "Impossible d'analyser ce document.");
+      setErrorMsg(err instanceof Error ? err.message : "Impossible d'analyser ce document.");
     } finally {
       setIsParsingBill(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  const calculateScenario = (kw: number, customCost?: number) => {
-    const cost = customCost ?? (kw === 3 ? 7500 : kw === 6 ? 13000 : 18000);
-    const prod = kw * productible;
-    const prixKwhAchat = 0.25;
-    const partAutoconso = 0.7;
-    const tarifRachatSurplus = 0.13;
-
-    const ecoAutoconso = Math.min(prod * partAutoconso, consoAnnuelle) * prixKwhAchat;
-    const vente = Math.max(0, prod - prod * partAutoconso) * tarifRachatSurplus;
-    const ecoAnnuelle = ecoAutoconso + vente;
-    const roi = ecoAnnuelle > 0 ? (cost / ecoAnnuelle).toFixed(1) : "N/A";
-    const gain20 = ecoAnnuelle * 20 - cost;
-    const co2 = Math.round(prod * 0.05);
-
-    return { kw, cost, prod, ecoAnnuelle, roi, gain20, co2 };
-  };
+  const calculateScenario = (kw: number, customCost?: number) =>
+    calculateSolarScenario(kw, productible, consoAnnuelle, customCost);
 
   const currentScenario = calculateScenario(puissanceKw, coutInstallation);
   const scenario3k = calculateScenario(3, 7500);
@@ -265,22 +247,49 @@ export default function Home() {
     setIsSaving(true);
 
     try {
-      await fetch("/api/leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nom: nomClient,
-          email: emailClient || "contact@client.fr",
-          telephone: telClient,
-          adresse: selectedAddress ? selectedAddress.label : addressInput,
-          region,
-          societe: companyConfig.companyName || "SOLAR ENERGIE",
-          productible_pvgis: productible,
-          puissance_kw: puissanceKw,
-          economie_annuelle: Math.round(currentScenario.ecoAnnuelle),
-          gain_20ans: Math.round(currentScenario.gain20),
-        }),
-      });
+      try {
+        await fetch("/api/leads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nom: nomClient.trim(),
+            email: emailClient.trim() || null,
+            telephone: telClient.trim() || null,
+            adresse: selectedAddress ? selectedAddress.label : addressInput.trim() || null,
+            region,
+            societe: companyConfig.companyName || "SOLAR ENERGIE",
+            productible_pvgis: productible,
+            puissance_kw: puissanceKw,
+            economie_annuelle: Math.round(currentScenario.ecoAnnuelle),
+            gain_20ans: Math.round(currentScenario.gain20),
+          }),
+        });
+      } catch (saveError) {
+        console.warn("Enregistrement distant indisponible:", saveError);
+      }
+
+      const localProject = {
+        id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now()),
+        created_at: new Date().toISOString(),
+        nom: nomClient.trim(),
+        email: emailClient.trim(),
+        telephone: telClient.trim(),
+        adresse: selectedAddress ? selectedAddress.label : addressInput.trim(),
+        region,
+        puissance_kw: puissanceKw,
+        economie_annuelle: Math.round(currentScenario.ecoAnnuelle),
+        gain_20ans: Math.round(currentScenario.gain20),
+        productible,
+        conso_annuelle: consoAnnuelle,
+      };
+      try {
+        const existing = JSON.parse(localStorage.getItem("solar_projects") || "[]");
+        const safeExisting = Array.isArray(existing) ? existing : [];
+        localStorage.setItem("solar_projects", JSON.stringify([localProject, ...safeExisting].slice(0, 100)));
+      } catch (storageError) {
+        console.warn("Historique local indisponible:", storageError);
+      }
+
       setShowOnePageResult(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
@@ -295,333 +304,398 @@ export default function Home() {
   const handleDownloadPdf = () => {
     setIsGeneratingPdf(true);
 
-    const doc = new jsPDF();
-    const dateJour = new Date().toLocaleDateString("fr-FR");
-    const adresseAffichee = selectedAddress ? selectedAddress.label : addressInput || "Adresse non spécifiée";
-    const brandName = (companyConfig.companyName || "SOLAR ENERGIE").toUpperCase();
+    try {
+      const doc = new jsPDF();
+      const dateJour = new Date().toLocaleDateString("fr-FR");
+      const adresseAffichee = selectedAddress ? selectedAddress.label : addressInput || "Adresse non spécifiée";
+      const brandName = (companyConfig.companyName || "SOLAR ENERGIE").trim();
+      const primary = companyConfig.primaryColor || "#2563eb";
 
-    const renderFooter = (pageNumber: number) => {
-      doc.setFontSize(7.5);
-      doc.setTextColor(148, 163, 184);
-      doc.text(
-        `Étude réalisée par ${companyConfig.companyName || "SOLAR ENERGIE"} ${
-          companyConfig.siret ? `• SIRET: ${companyConfig.siret}` : ""
-        } • Modèle PVGIS 5.2 • Confidentiel`,
-        14,
-        285
-      );
-      doc.text(`Page ${pageNumber} / 5`, 185, 285);
-    };
+      const hexToRgb = (hex: string) => {
+        const normalized = hex.replace("#", "");
+        const value = normalized.length === 3
+          ? normalized.split("").map((c) => c + c).join("")
+          : normalized;
+        const n = Number.parseInt(value, 16);
+        return {
+          r: (n >> 16) & 255,
+          g: (n >> 8) & 255,
+          b: n & 255,
+        };
+      };
 
-    const renderHeader = (title: string, subtitle: string) => {
+      const brandRgb = hexToRgb(primary);
+
+      const split = (text: string, width: number) => doc.splitTextToSize(text, width);
+
+      const addLogo = (x: number, y: number, maxW: number, maxH: number) => {
+        if (!companyConfig.logoBase64) return false;
+        try {
+          const format = companyConfig.logoBase64.startsWith("data:image/jpeg") ? "JPEG" : "PNG";
+          doc.addImage(companyConfig.logoBase64, format, x, y, maxW, maxH);
+          return true;
+        } catch {
+          return false;
+        }
+      };
+
+      const renderFooter = (pageNumber: number) => {
+        doc.setFontSize(7);
+        doc.setTextColor(148, 163, 184);
+        const footerText = `Pré-étude réalisée par ${brandName}${companyConfig.siret ? ` • SIRET : ${companyConfig.siret}` : ""} • Données PVGIS • Confidentiel`;
+        doc.text(footerText, 14, 287);
+        doc.text(`Page ${pageNumber} / 5`, 182, 287);
+      };
+
+      const renderHeader = (title: string, subtitle = "") => {
+        doc.setFillColor(15, 23, 42);
+        doc.rect(0, 0, 210, 30, "F");
+        doc.setTextColor(brandRgb.r, brandRgb.g, brandRgb.b);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9.5);
+        doc.text(brandName.toUpperCase(), 14, 12);
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.text(title, 14, 22);
+        if (subtitle) {
+          doc.setTextColor(148, 163, 184);
+          doc.setFontSize(7.5);
+          doc.setFont("helvetica", "normal");
+          doc.text(subtitle, 145, 22);
+        }
+      };
+
+      const drawMetric = (x: number, y: number, w: number, label: string, value: string, tone: "dark" | "blue" | "green" = "dark") => {
+        const bg = tone === "blue" ? [239, 246, 255] : tone === "green" ? [236, 253, 245] : [248, 250, 252];
+        const text = tone === "blue" ? [37, 99, 235] : tone === "green" ? [5, 150, 105] : [15, 23, 42];
+        doc.setFillColor(bg[0], bg[1], bg[2]);
+        doc.setDrawColor(226, 232, 240);
+        doc.roundedRect(x, y, w, 30, 3, 3, "FD");
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text(label, x + 5, y + 9);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.setTextColor(text[0], text[1], text[2]);
+        doc.text(value, x + 5, y + 22);
+      };
+
+      // PAGE 1 — COVER
       doc.setFillColor(15, 23, 42);
-      doc.rect(0, 0, 210, 32, "F");
+      doc.rect(0, 0, 210, 297, "F");
+      doc.setFillColor(brandRgb.r, brandRgb.g, brandRgb.b);
+      doc.rect(0, 0, 6, 297, "F");
 
-      doc.setTextColor(59, 130, 246);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.text(brandName, 14, 13);
+      const hasLogo = addLogo(25, 28, 42, 20);
+      if (!hasLogo) {
+        doc.setTextColor(brandRgb.r, brandRgb.g, brandRgb.b);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(15);
+        doc.text(brandName.toUpperCase(), 25, 43);
+      }
+
+      doc.setTextColor(148, 163, 184);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      const companyMeta = [companyConfig.website, companyConfig.telephone].filter(Boolean).join(" • ");
+      if (companyMeta) doc.text(companyMeta, 25, 55);
 
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(12);
-      doc.text(title, 14, 23);
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      doc.setTextColor(148, 163, 184);
-      doc.text(subtitle, 145, 23);
-    };
-
-    // Página 1 (Capa)
-    doc.setFillColor(15, 23, 42);
-    doc.rect(0, 0, 210, 297, "F");
-    doc.setFillColor(37, 99, 235);
-    doc.rect(0, 0, 6, 297, "F");
-
-    if (companyConfig.logoBase64) {
-      try {
-        doc.addImage(companyConfig.logoBase64, "PNG", 25, 35, 30, 15);
-      } catch (err) {
-        doc.setTextColor(59, 130, 246);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(14);
-        doc.text(brandName, 25, 45);
-      }
-    } else {
-      doc.setTextColor(59, 130, 246);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.text(brandName, 25, 45);
-    }
+      doc.setFontSize(25);
+      doc.text("ÉTUDE PHOTOVOLTAÏQUE", 25, 108);
+      doc.setFontSize(11);
+      doc.setTextColor(203, 213, 225);
+      doc.setFont("helvetica", "normal");
+      doc.text("Pré-étude énergétique et financière prévisionnelle", 25, 122);
 
-    doc.setTextColor(148, 163, 184);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text(
-      `${companyConfig.website || "Solutions Photovoltaïques Résidentielles"}  ${
-        companyConfig.telephone ? `| Tél : ${companyConfig.telephone}` : ""
-      }`,
-      25,
-      54
-    );
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(26);
-    doc.text("ÉTUDE DE FAISABILITÉ", 25, 110);
-    doc.text("PHOTOVOLTAÏQUE", 25, 122);
-
-    doc.setFontSize(11);
-    doc.setTextColor(203, 213, 225);
-    doc.setFont("helvetica", "normal");
-    doc.text("Dimensionnement technique, rentabilité prévisionnelle & comparatif multi-puissance", 25, 134);
-
-    doc.setFillColor(30, 41, 59);
-    doc.setDrawColor(51, 65, 85);
-    doc.roundedRect(25, 175, 160, 56, 4, 4, "FD");
-
-    doc.setTextColor(59, 130, 246);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.text("BÉNÉFICIAIRE & SITE D'INSTALLATION", 32, 186);
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10.5);
-    doc.text(`Projet de M./Mme : ${nomClient || "Non renseigné"}`, 32, 195);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(203, 213, 225);
-    doc.text(`Adresse du site : ${adresseAffichee}`, 32, 203);
-    doc.text(`Contact : ${emailClient || "Non renseigné"}  |  ${telClient || "Non renseigné"}`, 32, 211);
-    doc.text(`Gisement solaire (PVGIS) : ${productible} kWh / kWc / an`, 32, 219);
-    if (companyConfig.siret) {
-      doc.text(`Établi par : ${companyConfig.companyName} (SIRET: ${companyConfig.siret})`, 32, 227);
-    }
-
-    doc.setFontSize(8.5);
-    doc.setTextColor(148, 163, 184);
-    doc.text(`Date d'émission : ${dateJour}`, 25, 260);
-    doc.text(`Document officiel édité par ${companyConfig.companyName || "SOLAR ENERGIE"}`, 25, 266);
-
-    // Página 2 (Técnica)
-    doc.addPage();
-    renderHeader("SYNTHÈSE DU PROJET", "Étape 1 sur 4");
-    doc.setTextColor(15, 23, 42);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.text("1. Caractéristiques de l'Option Retenue", 14, 46);
-
-    doc.setFillColor(248, 250, 252);
-    doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(14, 52, 182, 65, 3, 3, "FD");
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(71, 85, 105);
-    doc.text("• Emplacement du site :", 20, 62);
-    doc.text("• Puissance crête sélectionnée :", 20, 72);
-    doc.text("• Surface de toiture requise :", 20, 82);
-    doc.text("• Gisement solaire réel (PVGIS) :", 20, 92);
-    doc.text("• Production annuelle estimée :", 20, 102);
-
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(15, 23, 42);
-    doc.text(`${adresseAffichee}`, 95, 62);
-    doc.text(`${puissanceKw} kWc (${puissanceKw === 3 ? "6-8" : puissanceKw === 6 ? "12-16" : "18-24"} modules)`, 95, 72);
-    doc.text(`env. ${puissanceKw * 5} m2 de toiture`, 95, 82);
-    doc.text(`${productible} kWh/kWc/an (Base JRC PVGIS)`, 95, 92);
-    doc.setTextColor(16, 185, 129);
-    doc.text(`${Math.round(currentScenario.prod)} kWh / an`, 95, 102);
-
-    doc.setTextColor(15, 23, 42);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.text("2. Bilan Écologique & Décarbonation", 14, 130);
-
-    doc.setFillColor(236, 253, 245);
-    doc.setDrawColor(16, 185, 129);
-    doc.roundedRect(14, 136, 182, 38, 3, 3, "FD");
-
-    doc.setTextColor(5, 150, 105);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.text("RÉDUCTION DE L'EMPREINTE CARBONE", 20, 146);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(71, 85, 105);
-    doc.text("Grâce à la production décarbonée de votre centrale solaire, vous évitez :", 20, 155);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(5, 150, 105);
-    doc.text(`env. ${currentScenario.co2} kg de CO2 par an (soit ${(currentScenario.co2 * 20 / 1000).toFixed(1)} tonnes de CO2 évitées sur 20 ans).`, 20, 164);
-    renderFooter(2);
-
-    // Página 3 (Comparativo 3 Cenários)
-    doc.addPage();
-    renderHeader("ANALYSE COMPARATIVE DES SCÉNARIOS", "Étape 2 sur 4");
-    doc.setTextColor(15, 23, 42);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.text("Comparatif Financier & Énergétique Multi-Options", 14, 46);
-
-    const startY = 56;
-    const colWidth = 58;
-
-    const scenarios = [
-      { name: "OPTION A (3 kWc)", s: scenario3k, isCurrent: puissanceKw === 3 },
-      { name: "OPTION B (6 kWc)", s: scenario6k, isCurrent: puissanceKw === 6 },
-      { name: "OPTION C (9 kWc)", s: scenario9k, isCurrent: puissanceKw === 9 },
-    ];
-
-    scenarios.forEach((sc, i) => {
-      const posX = 14 + i * 62;
-      
-      doc.setFillColor(sc.isCurrent ? 239 : 248, sc.isCurrent ? 246 : 250, sc.isCurrent ? 255 : 252);
-      doc.setDrawColor(sc.isCurrent ? 37 : 226, sc.isCurrent ? 99 : 232, sc.isCurrent ? 235 : 240);
-      doc.roundedRect(posX, startY, colWidth, 120, 3, 3, "FD");
-
+      doc.setFillColor(30, 41, 59);
+      doc.setDrawColor(51, 65, 85);
+      doc.roundedRect(25, 165, 160, 66, 4, 4, "FD");
+      doc.setTextColor(brandRgb.r, brandRgb.g, brandRgb.b);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8.5);
-      doc.setTextColor(sc.isCurrent ? 37 : 15, sc.isCurrent ? 99 : 23, sc.isCurrent ? 235 : 42);
-      doc.text(sc.name, posX + 5, startY + 10);
-      if (sc.isCurrent) {
-        doc.setFontSize(7);
-        doc.setTextColor(16, 185, 129);
-        doc.text("★ Choix retenu", posX + 5, startY + 16);
-      }
+      doc.text("PROJET", 32, 177);
 
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(11);
+      doc.text(`Client : ${nomClient || "Non renseigné"}`, 32, 188);
       doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(203, 213, 225);
+      const addressLines = split(`Site : ${adresseAffichee}`, 145);
+      doc.text(addressLines, 32, 199);
+      doc.text(`Puissance étudiée : ${puissanceKw} kWc`, 32, 199 + addressLines.length * 5 + 6);
+
+      doc.setTextColor(148, 163, 184);
       doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
+      doc.text(`Date d'émission : ${dateJour}`, 25, 260);
+      doc.text("Document de pré-étude — résultats indicatifs à confirmer selon les caractéristiques réelles du site.", 25, 268);
+      renderFooter(1);
 
-      doc.text("Investissement :", posX + 5, startY + 28);
-      doc.setFont("helvetica", "bold");
+      // PAGE 2 — PROJECT SYNTHESIS
+      doc.addPage();
+      renderHeader("SYNTHÈSE DU PROJET", "Données techniques");
       doc.setTextColor(15, 23, 42);
-      doc.text(`${sc.s.cost.toLocaleString("fr-FR")} € TTC`, posX + 5, startY + 35);
-
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(100, 116, 139);
-      doc.text("Production annuelle :", posX + 5, startY + 47);
       doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.text("Caractéristiques du projet", 14, 45);
+
+      drawMetric(14, 54, 84, "Puissance étudiée", `${puissanceKw} kWc`, "dark");
+      drawMetric(106, 54, 90, "Production estimée", `${Math.round(currentScenario.prod).toLocaleString("fr-FR")} kWh/an`, "green");
+      drawMetric(14, 89, 84, "Consommation annuelle", `${Math.round(consoAnnuelle).toLocaleString("fr-FR")} kWh/an`, "dark");
+      drawMetric(106, 89, 90, "Productible PVGIS", `${productible.toLocaleString("fr-FR")} kWh/kWc/an`, "blue");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
       doc.setTextColor(15, 23, 42);
-      doc.text(`${Math.round(sc.s.prod).toLocaleString("fr-FR")} kWh/an`, posX + 5, startY + 54);
+      doc.text("Bilan énergétique estimé", 14, 136);
 
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(100, 116, 139);
-      doc.text("Économies estimées :", posX + 5, startY + 66);
+      const energyRows = [
+        ["Production solaire", `${Math.round(currentScenario.prod).toLocaleString("fr-FR")} kWh/an`],
+        ["Énergie autoconsommée", `${Math.round(currentScenario.autoconsoKwh).toLocaleString("fr-FR")} kWh/an`],
+        ["Surplus injecté / valorisable", `${Math.round(currentScenario.surplusKwh).toLocaleString("fr-FR")} kWh/an`],
+        ["Taux d'autoconsommation", `${currentScenario.tauxAutoconsommation.toFixed(0)} %`],
+      ];
+      let y = 147;
+      energyRows.forEach(([label, value], index) => {
+        if (index % 2 === 0) {
+          doc.setFillColor(248, 250, 252);
+          doc.rect(14, y - 6, 182, 13, "F");
+        }
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(71, 85, 105);
+        doc.text(label, 20, y);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(15, 23, 42);
+        doc.text(value, 145, y);
+        y += 14;
+      });
+
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(37, 99, 235);
-      doc.text(`~${Math.round(sc.s.ecoAnnuelle).toLocaleString("fr-FR")} €/an`, posX + 5, startY + 73);
-
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(100, 116, 139);
-      doc.text("Retour brut (ROI) :", posX + 5, startY + 85);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
-      doc.text(`${sc.s.roi} ans`, posX + 5, startY + 92);
-
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(100, 116, 139);
-      doc.text("Bilan Net (20 ans) :", posX + 5, startY + 104);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(16, 185, 129);
-      doc.text(`+${Math.round(sc.s.gain20).toLocaleString("fr-FR")} €`, posX + 5, startY + 111);
-    });
-
-    renderFooter(3);
-
-    // Página 4 (Projeção 20 Anos)
-    doc.addPage();
-    renderHeader("PROJECTION SUR 20 ANS", "Étape 3 sur 4");
-    doc.setTextColor(15, 23, 42);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.text("Évolution Prévisionnelle de la Trésorerie", 14, 46);
-
-    doc.setFillColor(15, 23, 42);
-    doc.rect(14, 54, 182, 9, "F");
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8.5);
-    doc.text("Échéance", 20, 60);
-    doc.text("Production (kWh)", 60, 60);
-    doc.text("Économie / an (€)", 105, 60);
-    doc.text("Bilan Cumulé Net (€)", 150, 60);
-
-    const jalons = [1, 3, 5, 8, 10, 15, 20];
-    let posY = 71;
-
-    jalons.forEach((an, idx) => {
-      const cumul = currentScenario.ecoAnnuelle * an - coutInstallation;
-      if (idx % 2 === 0) {
-        doc.setFillColor(248, 250, 252);
-        doc.rect(14, posY - 5, 182, 8, "F");
-      }
-
+      doc.setFontSize(10.5);
+      doc.text("Localisation & méthodologie", 14, 210);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8.5);
       doc.setTextColor(71, 85, 105);
+      doc.text(split(`Adresse : ${adresseAffichee}`, 170), 20, 222);
+      doc.text("Les estimations de productible sont obtenues via l'API PVGIS à partir des coordonnées du site.", 20, 238);
+      doc.text("Le modèle actuel applique une perte système de 14 % et une inclinaison optimale dans PVGIS.", 20, 250);
 
-      doc.text(`Année ${an}`, 20, posY);
-      doc.text(`${Math.round(currentScenario.prod)} kWh`, 60, posY);
-      doc.text(`+${Math.round(currentScenario.ecoAnnuelle * an)} €`, 105, posY);
+      renderFooter(2);
 
-      if (cumul >= 0) {
+      // PAGE 3 — SCENARIOS
+      doc.addPage();
+      renderHeader("COMPARAISON DES SCÉNARIOS", "3 puissances");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Comparatif énergétique et financier", 14, 45);
+
+      const scenarios = [scenario3k, scenario6k, scenario9k];
+      const scenarioLabels = ["OPTION A", "OPTION B", "OPTION C"];
+      scenarios.forEach((sc, i) => {
+        const x = 14 + i * 62;
+        const selected = sc.kw === puissanceKw;
+        doc.setFillColor(selected ? 239 : 248, selected ? 246 : 250, selected ? 255 : 252);
+        doc.setDrawColor(selected ? brandRgb.r : 226, selected ? brandRgb.g : 232, selected ? brandRgb.b : 240);
+        doc.roundedRect(x, 56, 58, 126, 3, 3, "FD");
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(16, 185, 129);
-        doc.text(`+${Math.round(cumul)} €`, 150, posY);
-      } else {
-        doc.setTextColor(225, 29, 72);
-        doc.text(`${Math.round(cumul)} €`, 150, posY);
+        doc.setFontSize(8.5);
+        doc.setTextColor(selected ? brandRgb.r : 15, selected ? brandRgb.g : 23, selected ? brandRgb.b : 42);
+        doc.text(`${scenarioLabels[i]} • ${sc.kw} kWc`, x + 5, 67);
+        if (selected) {
+          doc.setFontSize(6.8);
+          doc.setTextColor(5, 150, 105);
+          doc.text("SÉLECTIONNÉ", x + 5, 75);
+        }
+
+        const rows = [
+          ["Investissement", `${sc.cost.toLocaleString("fr-FR")} €`],
+          ["Production", `${Math.round(sc.prod).toLocaleString("fr-FR")} kWh/an`],
+          ["Autoconsommée", `${Math.round(sc.autoconsoKwh).toLocaleString("fr-FR")} kWh/an`],
+          ["Surplus", `${Math.round(sc.surplusKwh).toLocaleString("fr-FR")} kWh/an`],
+          ["Économies", `~${Math.round(sc.ecoAnnuelle).toLocaleString("fr-FR")} €/an`],
+          ["Retour", `${sc.roi} ans`],
+          ["Gain 20 ans", `${sc.gain20 >= 0 ? "+" : ""}${Math.round(sc.gain20).toLocaleString("fr-FR")} €`],
+        ];
+        let sy = 89;
+        rows.forEach(([label, value]) => {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(6.8);
+          doc.setTextColor(100, 116, 139);
+          doc.text(label, x + 5, sy);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(7.4);
+          doc.setTextColor(label === "Économies" ? 37 : label === "Gain 20 ans" ? 5 : 15, label === "Économies" ? 99 : label === "Gain 20 ans" ? 150 : 23, label === "Économies" ? 235 : label === "Gain 20 ans" ? 105 : 42);
+          doc.text(value, x + 5, sy + 7);
+          sy += 13;
+        });
+      });
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text("Les investissements affichés sont des hypothèses indicatives du simulateur et doivent être remplacés par un chiffrage réel.", 14, 198);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Lecture recommandée", 14, 220);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text(split("Comparez la production, l'autoconsommation et le temps de retour plutôt que la seule production annuelle. Le scénario doit être confirmé avec les contraintes réelles de toiture, d'usage et de raccordement.", 175), 14, 231);
+
+      renderFooter(3);
+
+      // PAGE 4 — FINANCIAL PROJECTION
+      doc.addPage();
+      renderHeader("PROJECTION FINANCIÈRE", "Horizon 20 ans");
+      doc.setTextColor(15, 23, 42);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.text("Évolution indicative du gain cumulé", 14, 45);
+
+      const chartX = 18;
+      const chartY = 62;
+      const chartW = 174;
+      const chartH = 88;
+      const maxValue = Math.max(currentScenario.gain20, 0);
+      const minValue = Math.min(-coutInstallation, 0);
+      const range = Math.max(1, maxValue - minValue);
+      const zeroY = chartY + chartH - ((0 - minValue) / range) * chartH;
+
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(chartX, chartY, chartW, chartH);
+      doc.setDrawColor(148, 163, 184);
+      doc.line(chartX, zeroY, chartX + chartW, zeroY);
+
+      const points: { x: number; y: number }[] = [];
+      for (let year = 0; year <= 20; year++) {
+        const cumulative = year === 0 ? -coutInstallation : currentScenario.ecoAnnuelle * year - coutInstallation;
+        const x = chartX + (year / 20) * chartW;
+        const y = chartY + chartH - ((cumulative - minValue) / range) * chartH;
+        points.push({ x, y });
       }
 
-      posY += 9;
-    });
-    renderFooter(4);
+      doc.setDrawColor(brandRgb.r, brandRgb.g, brandRgb.b);
+      doc.setLineWidth(0.8);
+      for (let i = 1; i < points.length; i++) {
+        doc.line(points[i - 1].x, points[i - 1].y, points[i].x, points[i].y);
+      }
+      doc.setLineWidth(0.2);
 
-    // Página 5 (Normas)
-    doc.addPage();
-    renderHeader("HYPOTHÈSES & MÉTHODOLOGIE", "Étape 4 sur 4");
-    doc.setTextColor(15, 23, 42);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.text("Cadre Technique & Données Satellitaires PVGIS", 14, 46);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(100, 116, 139);
+      [0, 5, 10, 15, 20].forEach((year) => {
+        const x = chartX + (year / 20) * chartW;
+        doc.text(String(year), x - 2, chartY + chartH + 10);
+      });
+      doc.text("Années", chartX + chartW - 18, chartY + chartH + 10);
 
-    doc.setFillColor(248, 250, 252);
-    doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(14, 52, 182, 115, 3, 3, "FD");
+      const milestones = [1, 5, 10, 15, 20];
+      let tableY = 177;
+      doc.setFillColor(15, 23, 42);
+      doc.rect(14, tableY, 182, 9, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.text("Année", 20, tableY + 6);
+      doc.text("Production", 55, tableY + 6);
+      doc.text("Gain annuel", 97, tableY + 6);
+      doc.text("Gain cumulé", 145, tableY + 6);
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9.5);
-    doc.setTextColor(15, 23, 42);
-    doc.text("1. Modèle de Rayonnement Solaire (PVGIS JRC)", 20, 63);
+      tableY += 15;
+      milestones.forEach((year, idx) => {
+        const cumulative = currentScenario.ecoAnnuelle * year - coutInstallation;
+        if (idx % 2 === 0) {
+          doc.setFillColor(248, 250, 252);
+          doc.rect(14, tableY - 5, 182, 11, "F");
+        }
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.8);
+        doc.setTextColor(71, 85, 105);
+        doc.text(String(year), 20, tableY);
+        doc.text(`${Math.round(currentScenario.prod).toLocaleString("fr-FR")} kWh`, 55, tableY);
+        doc.text(`~${Math.round(currentScenario.ecoAnnuelle).toLocaleString("fr-FR")} €`, 97, tableY);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(cumulative >= 0 ? 5 : 225, cumulative >= 0 ? 150 : 29, cumulative >= 0 ? 105 : 72);
+        doc.text(`${cumulative >= 0 ? "+" : ""}${Math.round(cumulative).toLocaleString("fr-FR")} €`, 145, tableY);
+        tableY += 12;
+      });
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.setTextColor(71, 85, 105);
-    doc.text("• Source : Photovoltaic Geographical Information System (PVGIS v5.2 - UE).", 20, 72);
-    doc.text("• Données météo : Re-analyse satellitaire SARAH2 haute résolution.", 20, 80);
-    doc.text(`• Facteur de productible appliqué au site : ${productible} kWh / kWc / an.`, 20, 88);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(split("Projection simplifiée à prix constants. Elle ne prend pas en compte tous les paramètres économiques, fiscaux, réglementaires, maintenance, financement, dégradation des modules ou évolution réelle des tarifs.", 175), 14, 258);
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9.5);
-    doc.setTextColor(15, 23, 42);
-    doc.text("2. Garanties & Conformité Réglementaire", 20, 102);
+      renderFooter(4);
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.setTextColor(71, 85, 105);
-    doc.text("• Modules monocristallins avec garantie de rendement linéaire 25 ans.", 20, 111);
-    doc.text(`• Installation réalisée par les équipes qualifiées de ${companyConfig.companyName || "SOLAR ENERGIE"}.`, 20, 119);
-    doc.text("• Rachat garanti sur 20 ans par EDF OA selon barème CRE en vigueur.", 20, 127);
-    doc.text("• Validation de conformité par le CONSUEL avant raccordement Enedis.", 20, 135);
-    renderFooter(5);
+      // PAGE 5 — ASSUMPTIONS & LIMITS
+      doc.addPage();
+      renderHeader("HYPOTHÈSES & MÉTHODOLOGIE", "À lire avant utilisation");
+      doc.setTextColor(15, 23, 42);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.text("Sources et paramètres du simulateur", 14, 46);
 
-    const clientFilename = (nomClient || "etude").trim().replace(/\s+/g, "_");
-    doc.save(`etude-photovoltaique-${clientFilename}.pdf`);
-    setIsGeneratingPdf(false);
+      const assumptions = [
+        ["Données solaires", "PVGIS 5.3 / JRC, interrogé à partir des coordonnées du site."],
+        ["Pertes système", "14 % dans le calcul PVGIS du simulateur."],
+        ["Tarif électricité achat", `${DEFAULT_PRICES.purchase.toFixed(2).replace(".", ",")} €/kWh dans le modèle actuel.`],
+        ["Valorisation du surplus", `${DEFAULT_PRICES.surplus.toFixed(2).replace(".", ",")} €/kWh dans le modèle actuel.`],
+        ["Autoconsommation", "Hypothèse simplifiée : jusqu'à 70 % de la production, plafonnée par la consommation annuelle."],
+        ["Projection", "20 ans, avec gain annuel constant dans le modèle actuel."],
+        ["CO₂", "Indicateur directionnel basé sur un facteur simplifié ; à utiliser comme ordre de grandeur."],
+      ];
+
+      let ay = 60;
+      assumptions.forEach(([label, value], idx) => {
+        if (idx % 2 === 0) {
+          doc.setFillColor(248, 250, 252);
+          doc.rect(14, ay - 6, 182, 22, "F");
+        }
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7.8);
+        doc.setTextColor(15, 23, 42);
+        doc.text(label, 20, ay);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.6);
+        doc.setTextColor(71, 85, 105);
+        doc.text(split(value, 120), 72, ay);
+        ay += 24;
+      });
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Limites du document", 14, 235);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(71, 85, 105);
+      const limitations = [
+        "Ce document constitue une pré-étude indicative et ne remplace pas une étude technique d'exécution.",
+        "Les résultats dépendent de l'orientation, de l'inclinaison, des ombrages, de l'équipement, des usages et des conditions réelles du site.",
+        "Les hypothèses tarifaires et économiques doivent être vérifiées avant toute décision commerciale ou contractuelle.",
+        "Les informations réglementaires ou de raccordement ne sont pas garanties par ce document.",
+      ];
+      let ly = 247;
+      limitations.forEach((line) => {
+        doc.text(`• ${line}`, 20, ly, { maxWidth: 170 });
+        ly += 10;
+      });
+
+      renderFooter(5);
+
+      const safeName = (nomClient || "projet").trim().replace(/[^\p{L}\p{N}\-_ ]/gu, "").replace(/\s+/g, "_").slice(0, 80);
+      doc.save(`pre-etude-photovoltaique-${safeName || "projet"}.pdf`);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   return (
@@ -700,16 +774,43 @@ export default function Home() {
               </div>
 
               <div className="p-5 rounded-2xl bg-zinc-50 border border-zinc-200/80">
-                <span className="text-xs text-zinc-500 block mb-1">📈 Retour brut</span>
+                <span className="text-xs text-zinc-500 block mb-1">📈 Temps de retour</span>
                 <div className="text-2xl font-black text-zinc-950 font-mono">
                   {currentScenario.roi} <span className="text-xs font-normal text-zinc-400">ans</span>
                 </div>
               </div>
 
               <div className="p-5 rounded-2xl bg-emerald-50/60 border border-emerald-100">
-                <span className="text-xs text-emerald-700 block mb-1">🌱 CO₂ évité</span>
+                <span className="text-xs text-emerald-700 block mb-1">🌱 CO₂ évité (indicatif)</span>
                 <div className="text-2xl font-black text-emerald-600 font-mono">
                   {currentScenario.co2} <span className="text-xs font-normal text-emerald-500">kg/an</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-10 rounded-2xl border border-zinc-200 bg-white overflow-hidden">
+              <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-bold text-zinc-950">Bilan énergétique estimé</h3>
+                  <p className="text-[11px] text-zinc-500 mt-0.5">Répartition annuelle de la production photovoltaïque.</p>
+                </div>
+                <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Hypothèse d'autoconsommation</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-px bg-zinc-200">
+                <div className="bg-white p-5">
+                  <span className="text-[11px] text-zinc-500 block mb-1">Énergie autoconsommée</span>
+                  <span className="text-2xl font-black text-zinc-950 font-mono">{Math.round(currentScenario.autoconsoKwh).toLocaleString("fr-FR")} <span className="text-xs font-normal text-zinc-400">kWh/an</span></span>
+                  <span className="text-[11px] text-blue-600 font-semibold block mt-1">{currentScenario.tauxAutoconsommation.toFixed(0)} % de la production</span>
+                </div>
+                <div className="bg-white p-5">
+                  <span className="text-[11px] text-zinc-500 block mb-1">Surplus valorisable</span>
+                  <span className="text-2xl font-black text-zinc-950 font-mono">{Math.round(currentScenario.surplusKwh).toLocaleString("fr-FR")} <span className="text-xs font-normal text-zinc-400">kWh/an</span></span>
+                  <span className="text-[11px] text-zinc-500 block mt-1">Production non autoconsommée</span>
+                </div>
+                <div className="bg-white p-5">
+                  <span className="text-[11px] text-zinc-500 block mb-1">Gain annuel estimé</span>
+                  <span className="text-2xl font-black text-blue-600 font-mono">~{Math.round(currentScenario.ecoAnnuelle).toLocaleString("fr-FR")} <span className="text-xs font-normal text-zinc-400">€/an</span></span>
+                  <span className="text-[11px] text-zinc-500 block mt-1">Autoconsommation + surplus</span>
                 </div>
               </div>
             </div>
@@ -724,7 +825,7 @@ export default function Home() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[
                   { title: "OPTION A", kw: 3, s: scenario3k },
-                  { title: "OPTION B (Recommandé)", kw: 6, s: scenario6k },
+                  { title: "OPTION B", kw: 6, s: scenario6k },
                   { title: "OPTION C", kw: 9, s: scenario9k },
                 ].map((item) => {
                   const isSelected = puissanceKw === item.kw;
@@ -763,15 +864,23 @@ export default function Home() {
                           <span className="font-bold text-zinc-900 font-mono">{Math.round(item.s.prod).toLocaleString("fr-FR")} kWh</span>
                         </div>
                         <div className="flex justify-between text-zinc-600">
+                          <span>Autoconsommée :</span>
+                          <span className="font-bold text-zinc-900 font-mono">{Math.round(item.s.autoconsoKwh).toLocaleString("fr-FR")} kWh</span>
+                        </div>
+                        <div className="flex justify-between text-zinc-600">
+                          <span>Surplus :</span>
+                          <span className="font-bold text-zinc-900 font-mono">{Math.round(item.s.surplusKwh).toLocaleString("fr-FR")} kWh</span>
+                        </div>
+                        <div className="flex justify-between text-zinc-600">
                           <span>Économies / an :</span>
                           <span className="font-bold text-blue-600 font-mono">~{Math.round(item.s.ecoAnnuelle).toLocaleString("fr-FR")} €</span>
                         </div>
                         <div className="flex justify-between text-zinc-600">
-                          <span>Retour brut :</span>
+                          <span>Temps de retour :</span>
                           <span className="font-bold text-zinc-900 font-mono">{item.s.roi} ans</span>
                         </div>
                         <div className="flex justify-between text-zinc-600 pt-2 border-t border-zinc-100">
-                          <span>Gain Net (20 ans) :</span>
+                          <span>Gain cumulé estimé (20 ans) :</span>
                           <span className="font-bold text-emerald-600 font-mono">+{Math.round(item.s.gain20).toLocaleString("fr-FR")} €</span>
                         </div>
                       </div>
@@ -795,7 +904,7 @@ export default function Home() {
                 disabled={isGeneratingPdf}
                 className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 active:scale-[0.99] text-white font-semibold py-3.5 px-6 rounded-xl transition text-sm shadow-md cursor-pointer"
               >
-                {isGeneratingPdf ? "Édition du rapport..." : "Télécharger l'étude PDF avec Comparatif (5 pages) →"}
+                {isGeneratingPdf ? "Édition du rapport..." : "Télécharger le rapport PDF (5 pages) →"}
               </button>
             </div>
 
@@ -815,7 +924,7 @@ export default function Home() {
           <>
             <div className="max-w-3xl mb-12">
               <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 mb-3">
-                <span>Données Solaires Officielles PVGIS / Commission Européenne</span>
+                <span>Données solaires issues de PVGIS — Commission européenne</span>
               </div>
               <h1 className="text-4xl sm:text-5xl font-extrabold text-zinc-950 tracking-tight leading-[1.15] mb-4">
                 Étude photovoltaïque de précision.
@@ -834,7 +943,7 @@ export default function Home() {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept=".pdf, .txt"
+                      accept=".pdf,application/pdf"
                       onChange={handleBillUpload}
                       className="hidden"
                     />
@@ -861,7 +970,7 @@ export default function Home() {
                       <div className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-left animate-in fade-in duration-200">
                         <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-xs mb-2">
                           <span>✓</span>
-                          <span>Données extraites avec succès depuis la facture :</span>
+                          <span>{extractedBillData.conso ? "Données extraites depuis la facture :" : "Informations détectées dans la facture :"}</span>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-zinc-700">
                           <div>
@@ -961,6 +1070,18 @@ export default function Home() {
                         </div>
                       )}
 
+                      {pvgisError && (
+                        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                          <strong>PVGIS :</strong> {pvgisError}
+                        </div>
+                      )}
+
+                      {errorMsg && currentStep === 1 && (
+                        <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700">
+                          {errorMsg}
+                        </div>
+                      )}
+
                       <div className="pt-2">
                         <div className="flex justify-between items-center mb-2">
                           <label className="text-xs font-medium text-zinc-700">
@@ -989,10 +1110,19 @@ export default function Home() {
                       <div className="pt-4 border-t border-zinc-100 flex justify-end">
                         <button
                           type="button"
-                          onClick={() => setCurrentStep(2)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl transition text-sm shadow-sm cursor-pointer"
+                          onClick={() => {
+                            if (!selectedAddress) {
+                              setErrorMsg("Sélectionnez une adresse proposée afin d'utiliser les données PVGIS du site.");
+                              return;
+                            }
+                            if (pvgisError || isLoadingPvgis) return;
+                            setErrorMsg("");
+                            setCurrentStep(2);
+                          }}
+                          disabled={isLoadingPvgis || !!pvgisError}
+                          className="bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-300 disabled:cursor-not-allowed text-white font-semibold px-6 py-2.5 rounded-xl transition text-sm shadow-sm cursor-pointer"
                         >
-                          Étape suivante →
+                          {isLoadingPvgis ? "Analyse du site..." : "Étape suivante →"}
                         </button>
                       </div>
                     </div>
@@ -1189,7 +1319,7 @@ export default function Home() {
                     </div>
 
                     <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-100">
-                      <span className="text-[11px] font-medium text-zinc-500 block mb-1">Retour brut</span>
+                      <span className="text-[11px] font-medium text-zinc-500 block mb-1">Temps de retour</span>
                       <div className="text-2xl font-black text-zinc-950 font-mono tracking-tight">
                         {currentScenario.roi}
                       </div>
@@ -1197,7 +1327,7 @@ export default function Home() {
                     </div>
 
                     <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-100">
-                      <span className="text-[11px] font-medium text-zinc-500 block mb-1">CO₂ évité</span>
+                      <span className="text-[11px] font-medium text-zinc-500 block mb-1">CO₂ évité (indicatif)</span>
                       <div className="text-2xl font-black text-emerald-600 font-mono tracking-tight">
                         {currentScenario.co2}
                       </div>
@@ -1240,7 +1370,7 @@ export default function Home() {
                 Modèle Satellitaire PVGIS
               </h3>
               <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
-                Calculs d&apos;ensoleillement réels basés sur les bases de données SARAH2 de la Commission Européenne.
+                Estimation du productible à partir des données PVGIS disponibles pour la localisation du projet.
               </p>
             </div>
 
@@ -1252,7 +1382,7 @@ export default function Home() {
                 Comparateur 3 Scénarios
               </h3>
               <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
-                Présentez immédiatement les 3 options (3, 6 et 9 kWc) pour maximiser le taux de conversion en rendez-vous.
+                Présentez 3 options de puissance sur une même page pour faciliter la comparaison pendant le rendez-vous.
               </p>
             </div>
 
@@ -1261,10 +1391,10 @@ export default function Home() {
                 📑
               </div>
               <h3 className="text-base font-bold text-zinc-900 mb-2">
-                Dossier d&apos;Ingénierie White-Label
+                Rapport de pré-étude White-Label
               </h3>
               <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed">
-                Exportez un rapport technique documenté de 5 pages entièrement personnalisé avec le nom et logo de votre entreprise.
+                Exportez un rapport professionnel de 5 pages personnalisé avec le nom, le logo et les coordonnées de votre entreprise.
               </p>
             </div>
           </div>
@@ -1294,7 +1424,7 @@ export default function Home() {
               <span className="text-xs font-mono font-bold text-blue-600 block mb-3">02</span>
               <h3 className="text-base font-bold text-zinc-900 mb-2">Calcul PVGIS</h3>
               <p className="text-xs text-zinc-500 leading-relaxed">
-                L&apos;algorithme interroge la base européenne pour obtenir le gisement solaire exact.
+                Le simulateur interroge PVGIS pour estimer le productible du site à partir de sa localisation.
               </p>
             </div>
 
@@ -1306,22 +1436,11 @@ export default function Home() {
               </p>
             </div>
 
-            <HypothesesCalcul
-  puissanceKw={9}
-  consoAnnuelle={4200}
-  productionAnnuelle={12600}
-  productibleKwhKwc={1400}
-  coutTTC={18000}
-  primeAutoconsommation={2070}
-  economieAnnuelle={1691}
-  anneesROI={10.6}
-/>
-
             <div className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm relative">
               <span className="text-xs font-mono font-bold text-blue-600 block mb-3">04</span>
               <h3 className="text-base font-bold text-zinc-900 mb-2">Étude White-Label</h3>
               <p className="text-xs text-zinc-500 leading-relaxed">
-                Éditez et téléchargez l&apos;étude de 5 pages certifiée.
+                Éditez et téléchargez un rapport de pré-étude photovoltaïque de 5 pages.
               </p>
             </div>
           </div>
@@ -1334,7 +1453,7 @@ export default function Home() {
               Vous envisagez l&apos;installation de panneaux solaires ?
             </h2>
             <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
-              Obtenez une première estimation comparative basée sur les données PVGIS en moins de 60 secondes.
+              Obtenez une première estimation comparative basée sur les données PVGIS en quelques étapes.
             </p>
             <div className="pt-2">
               <a

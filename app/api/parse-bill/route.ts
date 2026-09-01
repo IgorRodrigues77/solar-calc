@@ -94,7 +94,7 @@ export async function POST(req: Request) {
     const base64Data = Buffer.from(arrayBuffer).toString("base64");
     console.info(`[parse-bill] Fichier PDF reçu: ${file.name} (${Math.round(file.size / 1024)} Ko). Envoi à Gemini 3.7 Flash...`);
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=${apiKey}`;
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent";
 
     const promptText = `Vous êtes un système OCR et d'analyse de données de haute précision, spécialisé dans les factures d'électricité françaises (EDF, TotalEnergies, Engie, Enedis, etc.).
 
@@ -132,6 +132,7 @@ Ne renvoyez ABSOLUMENT AUCUN texte avant ou après l'objet JSON.`;
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
       },
       signal: controller.signal,
       body: JSON.stringify({
@@ -139,8 +140,8 @@ Ne renvoyez ABSOLUMENT AUCUN texte avant ou après l'objet JSON.`;
           {
             parts: [
               {
-                inline_data: {
-                  mime_type: "application/pdf",
+                inlineData: {
+                  mimeType: "application/pdf",
                   data: base64Data,
                 },
               },
@@ -151,7 +152,16 @@ Ne renvoyez ABSOLUMENT AUCUN texte avant ou après l'objet JSON.`;
           },
         ],
         generationConfig: {
-          response_mime_type: "application/json",
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              nom: { type: "STRING" },
+              adresse: { type: "STRING" },
+              conso: { type: "INTEGER" },
+            },
+            required: ["nom", "adresse", "conso"],
+          },
         },
       }),
     });
@@ -193,11 +203,7 @@ Ne renvoyez ABSOLUMENT AUCUN texte avant ou après l'objet JSON.`;
     // Parsing sécurisé du JSON
     let parsed: BillExtractionResult;
     try {
-      const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("Format JSON non détecté dans la réponse IA");
-      }
-      parsed = JSON.parse(jsonMatch[0]);
+      parsed = JSON.parse(rawContent);
     } catch (parseErr) {
       console.error("[parse-bill] Erreur de décodage JSON:", parseErr);
       return NextResponse.json(
