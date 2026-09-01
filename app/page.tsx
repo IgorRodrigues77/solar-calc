@@ -1,3 +1,4 @@
+try {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
@@ -156,7 +157,7 @@
 
       renderFooter(5);
 
-      const safeName = (nomClient || "projet").trim().replace(/[^\p{L}\p{N}\-_ ]/gu, "").replace(/\s+/g, "_").slice(0, 80);
+      const safeName = (nomClient || "projet").trim().replace(/[^a-zA-Z0-9_-]/gu, "").replace(/\s+/g, "_").slice(0, 80);
       doc.save(`pre-etude-photovoltaique-${safeName || "projet"}.pdf`);
     } catch (error) {
       console.error("Erreur lors de la génération du PDF:", error);
