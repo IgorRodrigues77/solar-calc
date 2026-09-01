@@ -164,6 +164,7 @@ try {
     } finally {
       setIsGeneratingPdf(false);
     }
+  }; // <--- CHAVE EXTRA AQUI: Fecha a função handleDownloadPdf corretamente!
 
   return (
     <div className="min-h-screen bg-[#fafafa] text-zinc-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
