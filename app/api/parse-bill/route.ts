@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // Limite de 10 MB
-const GEMINI_MODEL = process.env.GEMINI_MODEL_ID?.trim() || "gemini-2.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL_ID?.trim() || "gemini-1.5-flash";
 const GEMINI_TIMEOUT_MS = 55_000;
 
 interface BillExtractionResult {
