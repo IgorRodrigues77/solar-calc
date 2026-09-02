@@ -112,10 +112,14 @@ export default function Home() {
     setIsLoadingPvgis(true);
     setPvgisError("");
     try {
-      const pvgisUrl = `https://re.jrc.ec.europa.eu/api/v5_3/PVcalc?lat=${lat}&lon=${lon}&peakpower=${kw}&loss=14&optimalinclination=1&outputformat=json`;
-      const res = await fetch(pvgisUrl);
-      if (!res.ok) throw new Error(`PVGIS HTTP ${res.status}`);
-      const data = await res.json();
+      const res = await fetch(`/api/pvgis?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&peakpower=${encodeURIComponent(kw)}`, {
+        method: "GET",
+        cache: "no-store",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || `PVGIS HTTP ${res.status}`);
+      }
       const annualYield = data?.outputs?.totals?.fixed?.E_y;
       if (typeof annualYield !== "number" || annualYield <= 0) {
         throw new Error("PVGIS n'a pas retourné une production annuelle exploitable.");
