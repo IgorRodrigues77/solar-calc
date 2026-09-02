@@ -1,4 +1,580 @@
-try {
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import jsPDF from "jspdf";
+import Link from "next/link";
+import { calculateSolarScenario, getRecommendedPower, getInstallationCost, DEFAULT_PRICES } from "./lib/solarCalculations";
+
+
+interface AddressSuggestion {
+  label: string;
+  postcode: string;
+  city: string;
+  context: string;
+  coordinates: [number, number];
+}
+
+interface CompanyConfig {
+  companyName?: string;
+  logoBase64?: string;
+  telephone?: string;
+  email?: string;
+  website?: string;
+  address?: string;
+  siret?: string;
+  primaryColor?: string;
+}
+
+export default function Home() {
+  const [currentStep, setCurrentStep] = useState(1);
+  const [showOnePageResult, setShowOnePageResult] = useState(false);
+
+  // Leitor Inteligente de Fatura
+  const [isParsingBill, setIsParsingBill] = useState(false);
+  const [extractedBillData, setExtractedBillData] = useState<{
+    nom?: string;
+    adresse?: string;
+    conso?: number;
+    puissanceRec?: number;
+  } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Configuração White-Label
+  const [companyConfig, setCompanyConfig] = useState<CompanyConfig>({
+    companyName: "SOLAR ENERGIE",
+  });
+
+  useEffect(() => {
+    const saved = localStorage.getItem("solar_company_config");
+    if (saved) {
+      try {
+        setCompanyConfig(JSON.parse(saved));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, []);
+
+  // Endereço e Geocodificação
+  const [addressInput, setAddressInput] = useState("");
+  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
+  const [selectedAddress, setSelectedAddress] = useState<AddressSuggestion | null>(null);
+  const [isLoadingPvgis, setIsLoadingPvgis] = useState(false);
+
+  // Dados Técnicos e Solares Reais (PVGIS)
+  const [region, setRegion] = useState("Île-de-France / Nord");
+  const [productible, setProductible] = useState(1050);
+  const [pvgisError, setPvgisError] = useState("");
+  const [puissanceKw, setPuissanceKw] = useState(6);
+  const [consoAnnuelle, setConsoAnnuelle] = useState(4800);
+  const [coutInstallation, setCoutInstallation] = useState(13000);
+
+  // Dados do Lead
+  const [nomClient, setNomClient] = useState("");
+  const [emailClient, setEmailClient] = useState("");
+  const [telClient, setTelClient] = useState("");
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    if (addressInput.length < 3 || (selectedAddress && addressInput === selectedAddress.label)) {
+      setSuggestions([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(addressInput)}&limit=5`
+        );
+        const data = await res.json();
+        if (data.features) {
+          const list: AddressSuggestion[] = data.features.map((f: any) => ({
+            label: f.properties.label,
+            postcode: f.properties.postcode,
+            city: f.properties.city,
+            context: f.properties.context,
+            coordinates: f.geometry.coordinates,
+          }));
+          setSuggestions(list);
+        }
+      } catch (err) {
+        console.error("Erreur API Adresse:", err);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [addressInput, selectedAddress]);
+
+  const fetchPvgisData = async (lat: number, lon: number, kw: number) => {
+    setIsLoadingPvgis(true);
+    setPvgisError("");
+    try {
+      const pvgisUrl = `https://re.jrc.ec.europa.eu/api/v5_3/PVcalc?lat=${lat}&lon=${lon}&peakpower=${kw}&loss=14&optimalinclination=1&outputformat=json`;
+      const res = await fetch(pvgisUrl);
+      if (!res.ok) throw new Error(`PVGIS HTTP ${res.status}`);
+      const data = await res.json();
+      const annualYield = data?.outputs?.totals?.fixed?.E_y;
+      if (typeof annualYield !== "number" || annualYield <= 0) {
+        throw new Error("PVGIS n'a pas retourné une production annuelle exploitable.");
+      }
+      setProductible(Math.round(annualYield / kw));
+    } catch (err) {
+      console.warn("Erreur PVGIS:", err);
+      setPvgisError("Les données solaires du site n'ont pas pu être récupérées. Vérifiez l'adresse ou réessayez.");
+    } finally {
+      setIsLoadingPvgis(false);
+    }
+  };
+
+  const handleSelectAddress = (addr: AddressSuggestion) => {
+    setPvgisError("");
+    setSelectedAddress(addr);
+    setAddressInput(addr.label);
+    setSuggestions([]);
+
+    const [lon, lat] = addr.coordinates;
+    const dept = parseInt(addr.postcode.substring(0, 2), 10);
+
+    if (lat < 44.5 || [13, 83, 84, 6, 4, 5, 30, 34, 66, 11, 20].includes(dept)) {
+      setRegion("Provence / PACA / Occitanie");
+    } else if (lat < 46.2 || [33, 40, 64, 24, 47, 69, 38, 73, 74].includes(dept)) {
+      setRegion("Sud-Ouest / Rhône-Alpes");
+    } else if (lat > 48.2 || [75, 77, 78, 91, 92, 93, 94, 95, 59, 62, 80, 60, 2].includes(dept)) {
+      setRegion("Île-de-France / Nord");
+    } else {
+      setRegion("Grand-Est / Centre");
+    }
+
+    fetchPvgisData(lat, lon, puissanceKw);
+  };
+
+  const handlePuissanceChange = (val: number) => {
+    setPuissanceKw(val);
+    setCoutInstallation(getInstallationCost(val));
+
+    if (selectedAddress) {
+      const [lon, lat] = selectedAddress.coordinates;
+      fetchPvgisData(lat, lon, val);
+    }
+  };
+
+  // Upload + analyse IA de facture via /api/parse-bill
+  const handleBillUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsParsingBill(true);
+    setExtractedBillData(null);
+    setErrorMsg("");
+    setPvgisError("");
+
+    try {
+      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      if (!isPdf) {
+        throw new Error("Veuillez sélectionner une facture au format PDF.");
+      }
+
+      const MAX_UPLOAD_SIZE = 10 * 1024 * 1024;
+      if (file.size === 0) {
+        throw new Error("Le fichier sélectionné est vide.");
+      }
+      if (file.size > MAX_UPLOAD_SIZE) {
+        throw new Error("Le fichier dépasse la taille maximale autorisée de 10 Mo.");
+      }
+
+      const formData = new FormData();
+      formData.append("file", file, file.name);
+
+      const res = await fetch("/api/parse-bill", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Impossible d'analyser cette facture.");
+      }
+
+      const nom = typeof data.nom === "string" && data.nom.trim() ? data.nom.trim() : "";
+      const adresse = typeof data.adresse === "string" && data.adresse.trim() ? data.adresse.trim() : "";
+      const conso = typeof data.conso === "number" && Number.isFinite(data.conso) && data.conso > 0
+        ? Math.round(data.conso)
+        : undefined;
+
+      if (nom) setNomClient(nom);
+
+      if (adresse) {
+        setAddressInput(adresse);
+
+        try {
+          const geoRes = await fetch(
+            `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(adresse)}&limit=1`,
+          );
+
+          if (geoRes.ok) {
+            const geoData = await geoRes.json();
+            const feature = geoData?.features?.[0];
+            if (feature) {
+              handleSelectAddress({
+                label: feature.properties.label,
+                postcode: feature.properties.postcode,
+                city: feature.properties.city,
+                context: feature.properties.context,
+                coordinates: feature.geometry.coordinates,
+              });
+            }
+          }
+        } catch (geoErr) {
+          console.warn("Géocodage automatique ignoré:", geoErr);
+        }
+      }
+
+      let puissanceRec: number | undefined;
+      if (conso !== undefined) {
+        setConsoAnnuelle(conso);
+        puissanceRec = getRecommendedPower(conso);
+
+        // Recalcule immédiatement le scénario avec la puissance recommandée.
+        setPuissanceKw(puissanceRec);
+        setCoutInstallation(getInstallationCost(puissanceRec));
+
+        if (selectedAddress) {
+          const [lon, lat] = selectedAddress.coordinates;
+          fetchPvgisData(lat, lon, puissanceRec);
+        }
+      }
+
+      setExtractedBillData({
+        nom: nom || undefined,
+        adresse: adresse || undefined,
+        conso,
+        puissanceRec,
+      });
+
+      if (!data.success && data.error) {
+        setErrorMsg(data.error);
+      }
+    } catch (err) {
+      console.error("Erreur lecture facture:", err);
+      setErrorMsg(
+        err instanceof Error ? err.message : "Impossible d'analyser cette facture.",
+      );
+    } finally {
+      setIsParsingBill(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const calculateScenario = (kw: number, customCost?: number) =>
+    calculateSolarScenario(kw, productible, consoAnnuelle, customCost);
+
+  const currentScenario = calculateScenario(puissanceKw, coutInstallation);
+  const scenario3k = calculateScenario(3, 7500);
+  const scenario6k = calculateScenario(6, 13000);
+  const scenario9k = calculateScenario(9, 18000);
+
+  const handleShowResultOnly = async () => {
+    if (!nomClient.trim()) {
+      setErrorMsg("Veuillez renseigner le nom du client.");
+      return;
+    }
+
+    setErrorMsg("");
+    setIsSaving(true);
+
+    try {
+      try {
+        await fetch("/api/leads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nom: nomClient.trim(),
+            email: emailClient.trim() || null,
+            telephone: telClient.trim() || null,
+            adresse: selectedAddress ? selectedAddress.label : addressInput.trim() || null,
+            region,
+            societe: companyConfig.companyName || "SOLAR ENERGIE",
+            productible_pvgis: productible,
+            puissance_kw: puissanceKw,
+            economie_annuelle: Math.round(currentScenario.ecoAnnuelle),
+            gain_20ans: Math.round(currentScenario.gain20),
+          }),
+        });
+      } catch (saveError) {
+        console.warn("Enregistrement distant indisponible:", saveError);
+      }
+
+      const localProject = {
+        id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now()),
+        created_at: new Date().toISOString(),
+        nom: nomClient.trim(),
+        email: emailClient.trim(),
+        telephone: telClient.trim(),
+        adresse: selectedAddress ? selectedAddress.label : addressInput.trim(),
+        region,
+        puissance_kw: puissanceKw,
+        economie_annuelle: Math.round(currentScenario.ecoAnnuelle),
+        gain_20ans: Math.round(currentScenario.gain20),
+        productible,
+        conso_annuelle: consoAnnuelle,
+      };
+      try {
+        const existing = JSON.parse(localStorage.getItem("solar_projects") || "[]");
+        const safeExisting = Array.isArray(existing) ? existing : [];
+        localStorage.setItem("solar_projects", JSON.stringify([localProject, ...safeExisting].slice(0, 100)));
+      } catch (storageError) {
+        console.warn("Historique local indisponible:", storageError);
+      }
+
+      setShowOnePageResult(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      console.error(e);
+      setShowOnePageResult(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDownloadPdf = () => {
+    setIsGeneratingPdf(true);
+
+    try {
+      const doc = new jsPDF();
+      const dateJour = new Date().toLocaleDateString("fr-FR");
+      const adresseAffichee = selectedAddress ? selectedAddress.label : addressInput || "Adresse non spécifiée";
+      const brandName = (companyConfig.companyName || "SOLAR ENERGIE").trim();
+      const primary = companyConfig.primaryColor || "#2563eb";
+
+      const hexToRgb = (hex: string) => {
+        const normalized = hex.replace("#", "");
+        const value = normalized.length === 3
+          ? normalized.split("").map((c) => c + c).join("")
+          : normalized;
+        const n = Number.parseInt(value, 16);
+        return {
+          r: (n >> 16) & 255,
+          g: (n >> 8) & 255,
+          b: n & 255,
+        };
+      };
+
+      const brandRgb = hexToRgb(primary);
+
+      const split = (text: string, width: number) => doc.splitTextToSize(text, width);
+
+      const addLogo = (x: number, y: number, maxW: number, maxH: number) => {
+        if (!companyConfig.logoBase64) return false;
+        try {
+          const format = companyConfig.logoBase64.startsWith("data:image/jpeg") ? "JPEG" : "PNG";
+          doc.addImage(companyConfig.logoBase64, format, x, y, maxW, maxH);
+          return true;
+        } catch {
+          return false;
+        }
+      };
+
+      const renderFooter = (pageNumber: number) => {
+        doc.setFontSize(7);
+        doc.setTextColor(148, 163, 184);
+        const footerText = `Pré-étude réalisée par ${brandName}${companyConfig.siret ? ` • SIRET : ${companyConfig.siret}` : ""} • Données PVGIS • Confidentiel`;
+        doc.text(footerText, 14, 287);
+        doc.text(`Page ${pageNumber} / 5`, 182, 287);
+      };
+
+      const renderHeader = (title: string, subtitle = "") => {
+        doc.setFillColor(15, 23, 42);
+        doc.rect(0, 0, 210, 30, "F");
+        doc.setTextColor(brandRgb.r, brandRgb.g, brandRgb.b);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9.5);
+        doc.text(brandName.toUpperCase(), 14, 12);
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.text(title, 14, 22);
+        if (subtitle) {
+          doc.setTextColor(148, 163, 184);
+          doc.setFontSize(7.5);
+          doc.setFont("helvetica", "normal");
+          doc.text(subtitle, 145, 22);
+        }
+      };
+
+      const drawMetric = (x: number, y: number, w: number, label: string, value: string, tone: "dark" | "blue" | "green" = "dark") => {
+        const bg = tone === "blue" ? [239, 246, 255] : tone === "green" ? [236, 253, 245] : [248, 250, 252];
+        const text = tone === "blue" ? [37, 99, 235] : tone === "green" ? [5, 150, 105] : [15, 23, 42];
+        doc.setFillColor(bg[0], bg[1], bg[2]);
+        doc.setDrawColor(226, 232, 240);
+        doc.roundedRect(x, y, w, 30, 3, 3, "FD");
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text(label, x + 5, y + 9);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.setTextColor(text[0], text[1], text[2]);
+        doc.text(value, x + 5, y + 22);
+      };
+
+      // PAGE 1 — COVER
+      doc.setFillColor(15, 23, 42);
+      doc.rect(0, 0, 210, 297, "F");
+      doc.setFillColor(brandRgb.r, brandRgb.g, brandRgb.b);
+      doc.rect(0, 0, 6, 297, "F");
+
+      const hasLogo = addLogo(25, 28, 42, 20);
+      if (!hasLogo) {
+        doc.setTextColor(brandRgb.r, brandRgb.g, brandRgb.b);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(15);
+        doc.text(brandName.toUpperCase(), 25, 43);
+      }
+
+      doc.setTextColor(148, 163, 184);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      const companyMeta = [companyConfig.website, companyConfig.telephone].filter(Boolean).join(" • ");
+      if (companyMeta) doc.text(companyMeta, 25, 55);
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(25);
+      doc.text("ÉTUDE PHOTOVOLTAÏQUE", 25, 108);
+      doc.setFontSize(11);
+      doc.setTextColor(203, 213, 225);
+      doc.setFont("helvetica", "normal");
+      doc.text("Pré-étude énergétique et financière prévisionnelle", 25, 122);
+
+      doc.setFillColor(30, 41, 59);
+      doc.setDrawColor(51, 65, 85);
+      doc.roundedRect(25, 165, 160, 66, 4, 4, "FD");
+      doc.setTextColor(brandRgb.r, brandRgb.g, brandRgb.b);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.text("PROJET", 32, 177);
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(11);
+      doc.text(`Client : ${nomClient || "Non renseigné"}`, 32, 188);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(203, 213, 225);
+      const addressLines = split(`Site : ${adresseAffichee}`, 145);
+      doc.text(addressLines, 32, 199);
+      doc.text(`Puissance étudiée : ${puissanceKw} kWc`, 32, 199 + addressLines.length * 5 + 6);
+
+      doc.setTextColor(148, 163, 184);
+      doc.setFontSize(8);
+      doc.text(`Date d'émission : ${dateJour}`, 25, 260);
+      doc.text("Document de pré-étude — résultats indicatifs à confirmer selon les caractéristiques réelles du site.", 25, 268);
+      renderFooter(1);
+
+      // PAGE 2 — PROJECT SYNTHESIS
+      doc.addPage();
+      renderHeader("SYNTHÈSE DU PROJET", "Données techniques");
+      doc.setTextColor(15, 23, 42);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.text("Caractéristiques du projet", 14, 45);
+
+      drawMetric(14, 54, 84, "Puissance étudiée", `${puissanceKw} kWc`, "dark");
+      drawMetric(106, 54, 90, "Production estimée", `${Math.round(currentScenario.prod).toLocaleString("fr-FR")} kWh/an`, "green");
+      drawMetric(14, 89, 84, "Consommation annuelle", `${Math.round(consoAnnuelle).toLocaleString("fr-FR")} kWh/an`, "dark");
+      drawMetric(106, 89, 90, "Productible PVGIS", `${productible.toLocaleString("fr-FR")} kWh/kWc/an`, "blue");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Bilan énergétique estimé", 14, 136);
+
+      const energyRows = [
+        ["Production solaire", `${Math.round(currentScenario.prod).toLocaleString("fr-FR")} kWh/an`],
+        ["Énergie autoconsommée", `${Math.round(currentScenario.autoconsoKwh).toLocaleString("fr-FR")} kWh/an`],
+        ["Surplus injecté / valorisable", `${Math.round(currentScenario.surplusKwh).toLocaleString("fr-FR")} kWh/an`],
+        ["Taux d'autoconsommation", `${currentScenario.tauxAutoconsommation.toFixed(0)} %`],
+      ];
+      let y = 147;
+      energyRows.forEach(([label, value], index) => {
+        if (index % 2 === 0) {
+          doc.setFillColor(248, 250, 252);
+          doc.rect(14, y - 6, 182, 13, "F");
+        }
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(71, 85, 105);
+        doc.text(label, 20, y);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(15, 23, 42);
+        doc.text(value, 145, y);
+        y += 14;
+      });
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.text("Localisation & méthodologie", 14, 210);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text(split(`Adresse : ${adresseAffichee}`, 170), 20, 222);
+      doc.text("Les estimations de productible sont obtenues via l'API PVGIS à partir des coordonnées du site.", 20, 238);
+      doc.text("Le modèle actuel applique une perte système de 14 % et une inclinaison optimale dans PVGIS.", 20, 250);
+
+      renderFooter(2);
+
+      // PAGE 3 — SCENARIOS
+      doc.addPage();
+      renderHeader("COMPARAISON DES SCÉNARIOS", "3 puissances");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Comparatif énergétique et financier", 14, 45);
+
+      const scenarios = [scenario3k, scenario6k, scenario9k];
+      const scenarioLabels = ["OPTION A", "OPTION B", "OPTION C"];
+      scenarios.forEach((sc, i) => {
+        const x = 14 + i * 62;
+        const selected = sc.kw === puissanceKw;
+        doc.setFillColor(selected ? 239 : 248, selected ? 246 : 250, selected ? 255 : 252);
+        doc.setDrawColor(selected ? brandRgb.r : 226, selected ? brandRgb.g : 232, selected ? brandRgb.b : 240);
+        doc.roundedRect(x, 56, 58, 126, 3, 3, "FD");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8.5);
+        doc.setTextColor(selected ? brandRgb.r : 15, selected ? brandRgb.g : 23, selected ? brandRgb.b : 42);
+        doc.text(`${scenarioLabels[i]} • ${sc.kw} kWc`, x + 5, 67);
+        if (selected) {
+          doc.setFontSize(6.8);
+          doc.setTextColor(5, 150, 105);
+          doc.text("SÉLECTIONNÉ", x + 5, 75);
+        }
+
+        const rows = [
+          ["Investissement", `${sc.cost.toLocaleString("fr-FR")} €`],
+          ["Production", `${Math.round(sc.prod).toLocaleString("fr-FR")} kWh/an`],
+          ["Autoconsommée", `${Math.round(sc.autoconsoKwh).toLocaleString("fr-FR")} kWh/an`],
+          ["Surplus", `${Math.round(sc.surplusKwh).toLocaleString("fr-FR")} kWh/an`],
+          ["Économies", `~${Math.round(sc.ecoAnnuelle).toLocaleString("fr-FR")} €/an`],
+          ["Retour", `${sc.roi} ans`],
+          ["Gain 20 ans", `${sc.gain20 >= 0 ? "+" : ""}${Math.round(sc.gain20).toLocaleString("fr-FR")} €`],
+        ];
+        let sy = 89;
+        rows.forEach(([label, value]) => {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(6.8);
+          doc.setTextColor(100, 116, 139);
+          doc.text(label, x + 5, sy);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(7.4);
+          doc.setTextColor(label === "Économies" ? 37 : label === "Gain 20 ans" ? 5 : 15, label === "Économies" ? 99 : label === "Gain 20 ans" ? 150 : 23, label === "Économies" ? 235 : label === "Gain 20 ans" ? 105 : 42);
+          doc.text(value, x + 5, sy + 7);
+          sy += 13;
+        });
+      });
+
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
@@ -108,9 +684,7 @@ try {
       doc.text("Sources et paramètres du simulateur", 14, 46);
 
       const assumptions = [
-        ["Données solaires", pvgisIsFallback
-          ? "Valeur moyenne nationale utilisée (le service PVGIS n'a pas répondu au moment de la simulation)."
-          : "PVGIS 5.3 / JRC, interrogé à partir des coordonnées du site."],
+        ["Données solaires", "PVGIS 5.3 / JRC, interrogé à partir des coordonnées du site."],
         ["Pertes système", "14 % dans le calcul PVGIS du simulateur."],
         ["Tarif électricité achat", `${DEFAULT_PRICES.purchase.toFixed(2).replace(".", ",")} €/kWh dans le modèle actuel.`],
         ["Valorisation du surplus", `${DEFAULT_PRICES.surplus.toFixed(2).replace(".", ",")} €/kWh dans le modèle actuel.`],
@@ -157,14 +731,12 @@ try {
 
       renderFooter(5);
 
-      const safeName = (nomClient || "projet").trim().replace(/[^a-zA-Z0-9_-]/gu, "").replace(/\s+/g, "_").slice(0, 80);
+      const safeName = (nomClient || "projet").trim().replace(/[^\p{L}\p{N}\-_ ]/gu, "").replace(/\s+/g, "_").slice(0, 80);
       doc.save(`pre-etude-photovoltaique-${safeName || "projet"}.pdf`);
-    } catch (error) {
-      console.error("Erreur lors de la génération du PDF:", error);
     } finally {
       setIsGeneratingPdf(false);
     }
-  }; // <--- CHAVE EXTRA AQUI: Fecha a função handleDownloadPdf corretamente!
+  };
 
   return (
     <div className="min-h-screen bg-[#fafafa] text-zinc-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
@@ -435,25 +1007,38 @@ try {
 
                     {/* CARD VISUAL DE FEEDBACK DOS DADOS EXTRAÍDOS */}
                     {extractedBillData && (
-                      <div className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-left animate-in fade-in duration-200">
-                        <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-xs mb-2">
-                          <span>✓</span>
-                          <span>{extractedBillData.conso ? "Données extraites depuis la facture :" : "Informations détectées dans la facture :"}</span>
+                      <div className={`mt-4 p-4 rounded-xl border text-left animate-in fade-in duration-200 ${
+                        extractedBillData.conso
+                          ? "bg-emerald-50 border-emerald-200"
+                          : "bg-amber-50 border-amber-200"
+                      }`}>
+                        <div className={`flex items-center gap-1.5 font-bold text-xs mb-3 ${
+                          extractedBillData.conso ? "text-emerald-800" : "text-amber-800"
+                        }`}>
+                          <span>{extractedBillData.conso ? "✓" : "!"}</span>
+                          <span>{extractedBillData.conso ? "Données vérifiables extraites de la facture" : "Informations partiellement détectées"}</span>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-zinc-700">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-zinc-700">
                           <div>
-                            <span className="text-zinc-400 block text-[10px]">Titulaire détecté :</span>
-                            <span className="font-semibold text-zinc-900">{extractedBillData.nom}</span>
+                            <span className="text-zinc-400 block text-[10px]">Titulaire</span>
+                            <span className="font-semibold text-zinc-900">{extractedBillData.nom || "Non détecté"}</span>
                           </div>
                           <div>
-                            <span className="text-zinc-400 block text-[10px]">Consommation annuelle :</span>
-                            <span className="font-bold text-blue-700 font-mono">{extractedBillData.conso?.toLocaleString("fr-FR")} kWh / an</span>
+                            <span className="text-zinc-400 block text-[10px]">Consommation annuelle</span>
+                            <span className="font-bold text-blue-700 font-mono">
+                              {extractedBillData.conso ? `${extractedBillData.conso.toLocaleString("fr-FR")} kWh / an` : "À vérifier manuellement"}
+                            </span>
                           </div>
                           <div className="sm:col-span-2">
-                            <span className="text-zinc-400 block text-[10px]">Lieu de consommation :</span>
-                            <span className="font-semibold text-zinc-900 truncate block">{extractedBillData.adresse}</span>
+                            <span className="text-zinc-400 block text-[10px]">Lieu de consommation</span>
+                            <span className="font-semibold text-zinc-900 break-words">{extractedBillData.adresse || "Non détecté"}</span>
                           </div>
                         </div>
+                        {!extractedBillData.conso && (
+                          <p className="mt-3 text-[11px] leading-relaxed text-amber-800">
+                            La consommation annuelle n&apos;a pas pu être confirmée automatiquement. Saisissez-la manuellement avant de poursuivre.
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -500,26 +1085,7 @@ try {
                           type="text"
                           placeholder="Ex: 12 Rue de Paris, Massy"
                           value={addressInput}
-                          onChange={(e) => {
-                            setAddressInput(e.target.value);
-                            if (selectedAddress && e.target.value !== selectedAddress.label) {
-                              setSelectedAddress(null);
-                              setPvgisError("");
-                              setPvgisIsFallback(false);
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              resolveAddressInput();
-                            }
-                          }}
-                          onBlur={() => {
-                            // Laisse le temps au clic sur une suggestion de s'exécuter avant de résoudre.
-                            setTimeout(() => {
-                              if (suggestions.length === 0) resolveAddressInput();
-                            }, 150);
-                          }}
+                          onChange={(e) => setAddressInput(e.target.value)}
                           className="w-full bg-zinc-50 border border-zinc-300 rounded-xl px-4 py-3 text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition"
                         />
 
@@ -549,7 +1115,7 @@ try {
                             </span>
                           </div>
                           <div className="flex justify-between items-center text-blue-900">
-                            <span>Gisement solaire {pvgisIsFallback ? "(estimation moyenne)" : "réel (PVGIS JRC)"} :</span>
+                            <span>Gisement solaire réel (PVGIS JRC) :</span>
                             <span className="font-mono font-bold text-blue-700">
                               {isLoadingPvgis ? "Calcul satellitaire..." : `${productible} kWh / kWc / an`}
                             </span>
@@ -558,21 +1124,8 @@ try {
                       )}
 
                       {pvgisError && (
-                        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start justify-between gap-3">
-                          <span><strong>PVGIS :</strong> {pvgisError}</span>
-                          {selectedAddress && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const [lon, lat] = selectedAddress.coordinates;
-                                fetchPvgisData(lat, lon, puissanceKw);
-                              }}
-                              disabled={isLoadingPvgis}
-                              className="shrink-0 text-amber-900 font-semibold underline underline-offset-2 cursor-pointer disabled:opacity-50"
-                            >
-                              Réessayer
-                            </button>
-                          )}
+                        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                          <strong>PVGIS :</strong> {pvgisError}
                         </div>
                       )}
 
@@ -591,15 +1144,34 @@ try {
                             {consoAnnuelle.toLocaleString("fr-FR")} kWh / an
                           </span>
                         </div>
-                        <input
-                          type="range"
-                          min={2000}
-                          max={15000}
-                          step={100}
-                          value={consoAnnuelle}
-                          onChange={(e) => setConsoAnnuelle(Number(e.target.value))}
-                          className="w-full h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                        />
+                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-center">
+                          <input
+                            type="range"
+                            min={2000}
+                            max={15000}
+                            step={100}
+                            value={consoAnnuelle}
+                            onChange={(e) => setConsoAnnuelle(Number(e.target.value))}
+                            className="w-full h-2 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                            aria-label="Consommation annuelle en kWh"
+                          />
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min={0}
+                              max={100000}
+                              step={100}
+                              value={consoAnnuelle}
+                              onChange={(e) => {
+                                const value = Number(e.target.value);
+                                if (Number.isFinite(value) && value >= 0) setConsoAnnuelle(value);
+                              }}
+                              className="w-28 bg-white border border-zinc-300 rounded-lg px-3 py-2 text-sm font-mono text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
+                              aria-label="Saisir la consommation annuelle"
+                            />
+                            <span className="text-xs text-zinc-500">kWh/an</span>
+                          </div>
+                        </div>
                         <div className="flex justify-between text-[11px] text-zinc-400 mt-1">
                           <span>2 000 kWh</span>
                           <span>8 000 kWh</span>
@@ -610,17 +1182,19 @@ try {
                       <div className="pt-4 border-t border-zinc-100 flex justify-end">
                         <button
                           type="button"
-                          onClick={async () => {
+                          onClick={() => {
+                            if (!selectedAddress) {
+                              setErrorMsg("Sélectionnez une adresse proposée afin d'utiliser les données PVGIS du site.");
+                              return;
+                            }
+                            if (pvgisError || isLoadingPvgis) return;
                             setErrorMsg("");
-                            const ok = await resolveAddressInput();
-                            if (!ok) return;
-                            if (isLoadingPvgis) return;
                             setCurrentStep(2);
                           }}
-                          disabled={isLoadingPvgis || isResolvingAddress}
+                          disabled={isLoadingPvgis || !!pvgisError}
                           className="bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-300 disabled:cursor-not-allowed text-white font-semibold px-6 py-2.5 rounded-xl transition text-sm shadow-sm cursor-pointer"
                         >
-                          {isResolvingAddress ? "Vérification de l'adresse..." : isLoadingPvgis ? "Analyse du site..." : "Étape suivante →"}
+                          {isLoadingPvgis ? "Analyse du site..." : "Étape suivante →"}
                         </button>
                       </div>
                     </div>
@@ -973,9 +1547,10 @@ try {
             {companyConfig.companyName || "SOLAR ENERGIE FRANCE"} • {companyConfig.siret ? `SIRET: ${companyConfig.siret}` : "Ingénierie Solaire"}
           </p>
           <p className="text-zinc-400">
-            Étude indicative établie selon les standards d&apos;ingénierie et barèmes de rachat 2026.
+            Document de pré-étude indicatif. Les hypothèses tarifaires et réglementaires doivent être vérifiées avant toute décision commerciale.
           </p>
         </div>
       </footer>
     </div>
   );
+}
